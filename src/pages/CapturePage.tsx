@@ -31,7 +31,7 @@ export function CapturePage({
   CameraComponent = CameraView,
   persistPoseSequence = savePoseSequence,
 }: CapturePageProps): React.JSX.Element {
-  const { id } = useParams();
+  const { patientId: patientIdParam } = useParams();
   const navigate = useNavigate();
   const setCapturedSequence = useAssessmentStore((state) => state.setCapturedSequence);
   const cameraRef = useRef<CameraViewHandle | null>(null);
@@ -41,7 +41,7 @@ export function CapturePage({
   const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const assessmentId = id ?? 'demo';
+  const patientId = patientIdParam ?? 'demo';
   const sequencePreview = useMemo(
     () => buildPoseSequence(frames),
     [frames],
@@ -89,12 +89,12 @@ export function CapturePage({
     try {
       setIsSaving(true);
       await persistPoseSequence({
-        assessmentId,
+        assessmentId: patientId,
         data: sequence,
-        id: createDraftPoseSequenceId(assessmentId),
+        id: createDraftPoseSequenceId(patientId),
       });
       setCapturedSequence(sequence);
-      navigate(`/assessment/${assessmentId}/analyzing`);
+      navigate(`/patient/${patientId}/analyzing`);
     } catch (error) {
       setErrorMessage(createPosePersistenceErrorMessage(error));
     } finally {
@@ -120,7 +120,7 @@ export function CapturePage({
           <h2 className="mt-2 text-3xl font-bold text-slate-950">Guided Camera Capture</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Assessment ID:{' '}
-            <span className="font-medium text-slate-950">{assessmentId}</span>
+            <span className="font-medium text-slate-950">{patientId}</span>
           </p>
         </div>
 
@@ -267,7 +267,7 @@ function createPosePersistenceErrorMessage(error: unknown): string {
     return 'Captured keypoints could not be saved because browser storage is unavailable or full. Free device storage, then try again.';
   }
 
-  return 'Captured keypoints could not be saved locally. Retry stopping the recording before leaving this page.';
+  return 'Captured keypoints could not be saved locally. Start a new recording before leaving this page.';
 }
 
 /** Builds a pose sequence from captured frames. */

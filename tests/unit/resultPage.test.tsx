@@ -95,7 +95,7 @@ function renderResultPage(
   render(
     <MemoryRouter initialEntries={['/assessment/assessment-1/result']}>
       <Routes>
-        <Route path="/assessment/:id/result" element={page} />
+        <Route path="/assessment/:assessmentId/result" element={page} />
       </Routes>
     </MemoryRouter>,
   );

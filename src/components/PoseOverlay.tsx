@@ -70,7 +70,7 @@ export function PoseOverlay({
         continue;
       }
 
-      if (from.visibility < 0.5 || to.visibility < 0.5) {
+      if (!isVisible(from) || !isVisible(to)) {
         continue;
       }
 
@@ -83,7 +83,7 @@ export function PoseOverlay({
     context.fillStyle = '#f97316';
 
     for (const landmark of frame.landmarks) {
-      if (landmark.visibility < 0.5) {
+      if (!isVisible(landmark)) {
         continue;
       }
 
@@ -102,4 +102,9 @@ export function PoseOverlay({
       width={width}
     />
   );
+}
+
+/** Return true when a landmark is visible enough to draw. */
+function isVisible(landmark: { visibility?: number }): boolean {
+  return (landmark.visibility ?? 0) >= 0.5;
 }

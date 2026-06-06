@@ -76,7 +76,7 @@ export function AnalyzingPage({
   analyze = analyzeGaitInWorker,
   repository = defaultRepository,
 }: AnalyzingPageProps): React.JSX.Element {
-  const { id } = useParams();
+  const { patientId: patientIdParam } = useParams();
   const navigate = useNavigate();
   const capturedSequence = useAssessmentStore((state) => state.capturedSequence);
   const clearCapturedSequence = useAssessmentStore((state) => state.clearCapturedSequence);
@@ -85,7 +85,7 @@ export function AnalyzingPage({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [failureQuality, setFailureQuality] = useState<QualityScore | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const patientId = id ?? '';
+  const patientId = patientIdParam ?? '';
 
   useEffect(() => {
     let isMounted = true;
@@ -216,7 +216,7 @@ export function AnalyzingPage({
           ) : null}
           <Link
             className="ml-3 inline-flex rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
-            to={`/assessment/${patientId}/capture`}
+            to={`/patient/${patientId}/capture`}
           >
             Retake capture
           </Link>

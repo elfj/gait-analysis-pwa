@@ -63,7 +63,7 @@ describe('CapturePage', () => {
 
   it('starts capture and updates recording summary', async () => {
     fakeStart.mockResolvedValueOnce();
-    fakePersistPoseSequence.mockResolvedValue('draft:assessment-1');
+    fakePersistPoseSequence.mockResolvedValue('draft:patient-1');
 
     renderCapturePage();
 
@@ -106,8 +106,8 @@ describe('CapturePage', () => {
     expect(fakeStop).toHaveBeenCalledTimes(1);
     expect(fakePersistPoseSequence).toHaveBeenCalledWith(
       expect.objectContaining({
-        assessmentId: 'assessment-1',
-        id: 'draft:assessment-1',
+        assessmentId: 'patient-1',
+        id: 'draft:patient-1',
       }),
     );
     expect(fakePersistPoseSequence.mock.calls[0]?.[0].data.frames).toEqual([poseFrame]);
@@ -118,10 +118,10 @@ describe('CapturePage', () => {
 /** Render CapturePage with route params and fake analyzing route. */
 function renderCapturePage(): void {
   render(
-    <MemoryRouter initialEntries={['/assessment/assessment-1/capture']}>
+    <MemoryRouter initialEntries={['/patient/patient-1/capture']}>
       <Routes>
         <Route
-          path="/assessment/:id/capture"
+          path="/patient/:patientId/capture"
           element={
             <CapturePage
               CameraComponent={FakeCameraView}
@@ -130,7 +130,7 @@ function renderCapturePage(): void {
           }
         />
         <Route
-          path="/assessment/:id/analyzing"
+          path="/patient/:patientId/analyzing"
           element={<div>Analyzing route</div>}
         />
       </Routes>

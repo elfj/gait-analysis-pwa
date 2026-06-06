@@ -49,6 +49,10 @@ export function HomePage({
 
   /** Delete a patient and refresh the visible list. */
   async function handleDelete(patientId: string): Promise<void> {
+    if (!confirmPatientDeletion(patientId)) {
+      return;
+    }
+
     await repository.deletePatient(patientId);
     setHistories((current) => removeHistory(current, patientId));
 
@@ -153,8 +157,8 @@ export function HomePage({
                         {patient.externalId ?? patient.id}
                       </p>
                       <p className="mt-1 text-sm text-slate-600">
-                        Born {String(patient.birthYear)} · {formatSex(patient.sex)} ·{' '}
-                        {String(patient.heightCm)} cm · {formatDiagnosis(patient.diagnosis)}
+                        Born {String(patient.birthYear)} | {formatSex(patient.sex)} |{' '}
+                        {String(patient.heightCm)} cm | {formatDiagnosis(patient.diagnosis)}
                       </p>
                     </button>
 
@@ -196,7 +200,7 @@ export function HomePage({
                               >
                                 {formatDate(result.performedAt)}
                               </Link>{' '}
-                              · gait speed {formatMetric(result.spatiotemporal.gaitSpeed)} m/s
+                              | gait speed {formatMetric(result.spatiotemporal.gaitSpeed)} m/s
                             </li>
                           ))}
                         </ul>
@@ -261,6 +265,13 @@ function removeHistory(
 ): Record<string, GaitAnalysisResult[]> {
   return Object.fromEntries(
     Object.entries(histories).filter(([historyPatientId]) => historyPatientId !== patientId),
+  );
+}
+
+/** Confirm destructive patient deletion with the browser-native dialog. */
+function confirmPatientDeletion(patientId: string): boolean {
+  return window.confirm(
+    `Delete patient ${patientId} and all linked assessments, pose keypoints, and results?`,
   );
 }
 

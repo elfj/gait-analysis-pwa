@@ -33,6 +33,7 @@ const patients: Patient[] = [
 describe('HomePage', () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('lists and searches patients', async () => {
@@ -63,6 +64,7 @@ describe('HomePage', () => {
 
   it('deletes a patient and refreshes the list', async () => {
     const repository = createRepository();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderHomePage(repository);
 
@@ -72,6 +74,18 @@ describe('HomePage', () => {
       expect(screen.queryByText('MRN-001')).toBeNull();
     });
     expect(repository.deletePatient).toHaveBeenCalledWith('patient-1');
+  });
+
+  it('keeps a patient when delete confirmation is cancelled', async () => {
+    const repository = createRepository();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderHomePage(repository);
+
+    await userEvent.click(await screen.findByLabelText('Delete MRN-001'));
+
+    expect(screen.getByText('MRN-001')).toBeDefined();
+    expect(repository.deletePatient).not.toHaveBeenCalled();
   });
 });
 

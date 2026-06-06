@@ -39,7 +39,7 @@ export function ResultPage({
   /** Optional repository override for tests. */
   repository?: ResultPageRepository;
 }): React.JSX.Element {
-  const { id } = useParams();
+  const { assessmentId: assessmentIdParam } = useParams();
   const reportRef = useRef<HTMLElement | null>(null);
   const [result, setResult] = useState<GaitAnalysisResult | null>(null);
   const [status, setStatus] = useState<
@@ -49,7 +49,7 @@ export function ResultPage({
   const [pdfStatus, setPdfStatus] = useState<'idle' | 'exporting' | 'error'>(
     'idle',
   );
-  const assessmentId = id ?? '';
+  const assessmentId = assessmentIdParam ?? '';
 
   useEffect(() => {
     let isMounted = true;

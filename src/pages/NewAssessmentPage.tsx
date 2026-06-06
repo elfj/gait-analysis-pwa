@@ -21,7 +21,7 @@ export function NewAssessmentPage(): React.JSX.Element {
         </p>
         <Link
           className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-          to={`/assessment/${patientId ?? 'demo'}/capture`}
+          to={`/patient/${patientId ?? 'demo'}/capture`}
         >
           Continue to capture
         </Link>

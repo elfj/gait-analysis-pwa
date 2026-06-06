@@ -21,9 +21,9 @@ const testRoutes = [
       { index: true, element: <HomePage /> },
       { path: 'patient/new', element: <NewPatientPage /> },
       { path: 'assessment/new/:patientId', element: <NewAssessmentPage /> },
-      { path: 'assessment/:id/capture', element: <CapturePage /> },
-      { path: 'assessment/:id/analyzing', element: <AnalyzingPage /> },
-      { path: 'assessment/:id/result', element: <ResultPage /> },
+      { path: 'patient/:patientId/capture', element: <CapturePage /> },
+      { path: 'patient/:patientId/analyzing', element: <AnalyzingPage /> },
+      { path: 'assessment/:assessmentId/result', element: <ResultPage /> },
     ],
   },
 ];
@@ -42,8 +42,8 @@ describe('application routes', () => {
     ['/', 'Gait Analysis MVP'],
     ['/patient/new', 'New Patient'],
     ['/assessment/new/patient-1', 'New 10MWT Assessment'],
-    ['/assessment/assessment-1/capture', 'Guided Camera Capture'],
-    ['/assessment/assessment-1/analyzing', 'Analyzing Assessment'],
+    ['/patient/patient-1/capture', 'Guided Camera Capture'],
+    ['/patient/patient-1/analyzing', 'Analyzing Assessment'],
     ['/assessment/assessment-1/result', 'Assessment Result'],
   ])('renders %s', async (path, heading) => {
     renderRoute(path);

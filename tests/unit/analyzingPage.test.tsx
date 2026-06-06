@@ -125,14 +125,14 @@ function renderAnalyzingPage({
   repository: AnalyzingPageRepository;
 }): void {
   render(
-    <MemoryRouter initialEntries={['/assessment/patient-1/analyzing']}>
+    <MemoryRouter initialEntries={['/patient/patient-1/analyzing']}>
       <Routes>
         <Route
-          path="/assessment/:id/analyzing"
+          path="/patient/:patientId/analyzing"
           element={<AnalyzingPage analyze={analyze} repository={repository} />}
         />
         <Route
-          path="/assessment/:id/result"
+          path="/assessment/:assessmentId/result"
           element={<div>Result route</div>}
         />
       </Routes>

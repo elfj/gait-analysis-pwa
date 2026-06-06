@@ -30,21 +30,21 @@ export const appRoutes: RouteObject[] = [
         },
       },
       {
-        path: 'assessment/:id/capture',
+        path: 'patient/:patientId/capture',
         lazy: async () => {
           const { CapturePage } = await import('./pages/CapturePage');
           return { Component: CapturePage };
         },
       },
       {
-        path: 'assessment/:id/analyzing',
+        path: 'patient/:patientId/analyzing',
         lazy: async () => {
           const { AnalyzingPage } = await import('./pages/AnalyzingPage');
           return { Component: AnalyzingPage };
         },
       },
       {
-        path: 'assessment/:id/result',
+        path: 'assessment/:assessmentId/result',
         lazy: async () => {
           const { ResultPage } = await import('./pages/ResultPage');
           return { Component: ResultPage };
