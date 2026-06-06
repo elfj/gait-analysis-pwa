@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, RotateCcw, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -11,9 +11,10 @@ import {
   analyzeGaitInWorker,
   type AnalyzeGaitRunner,
 } from '@/lib/gait/analysisRunner';
+import { computeQualityScore } from '@/lib/pose/qc';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import type { Assessment } from '@/types/assessment';
-import type { GaitAnalysisResult } from '@/types/gait';
+import type { GaitAnalysisResult, QualityScore } from '@/types/gait';
 import type { Patient } from '@/types/patient';
 import type { PoseSequence } from '@/types/pose';
 
@@ -23,6 +24,8 @@ const analysisStages = [
   'Joint kinematics',
   'Symmetry scoring',
 ] as const;
+
+const FALLBACK_QC_HEIGHT_CM = 170;
 
 type AnalysisStage = (typeof analysisStages)[number];
 
@@ -69,12 +72,19 @@ export function AnalyzingPage({
   const [completedStages, setCompletedStages] = useState<AnalysisStage[]>([]);
   const [activeStage, setActiveStage] = useState<AnalysisStage | null>(analysisStages[0]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [failureQuality, setFailureQuality] = useState<QualityScore | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const patientId = id ?? '';
 
   useEffect(() => {
     let isMounted = true;
 
     async function runAnalysis(): Promise<void> {
+      setCompletedStages([]);
+      setActiveStage(analysisStages[0]);
+      setErrorMessage(null);
+      setFailureQuality(null);
+
       if (!capturedSequence) {
         setErrorMessage('No captured pose sequence is available.');
         setActiveStage(null);
@@ -121,7 +131,8 @@ export function AnalyzingPage({
         navigate(`/assessment/${result.assessmentId}/result`);
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : 'Unable to analyze gait.');
+          setErrorMessage(createAnalysisErrorMessage(error));
+          setFailureQuality(computeQualityScore(capturedSequence, FALLBACK_QC_HEIGHT_CM));
           setActiveStage(null);
         }
       }
@@ -132,7 +143,7 @@ export function AnalyzingPage({
     return () => {
       isMounted = false;
     };
-  }, [analyze, capturedSequence, clearCapturedSequence, navigate, patientId, repository]);
+  }, [analyze, capturedSequence, clearCapturedSequence, navigate, patientId, repository, retryCount]);
 
   return (
     <section className="max-w-3xl space-y-6">
@@ -162,12 +173,25 @@ export function AnalyzingPage({
       </ol>
 
       {errorMessage ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div className="space-y-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <h3 className="flex items-center gap-2 font-semibold">
             <XCircle aria-hidden="true" className="h-4 w-4" />
             Analysis failed
           </h3>
-          <p className="mt-2">{errorMessage}</p>
+          <p>{errorMessage}</p>
+          {failureQuality ? <FailureQualityReport quality={failureQuality} /> : null}
+          {capturedSequence ? (
+            <button
+              className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
+              onClick={() => {
+                setRetryCount((current) => current + 1);
+              }}
+              type="button"
+            >
+              <RotateCcw aria-hidden="true" className="h-4 w-4" />
+              Retry analysis
+            </button>
+          ) : null}
         </div>
       ) : (
         <p className="text-sm text-slate-600">Analysis is running in a Web Worker.</p>
@@ -178,4 +202,60 @@ export function AnalyzingPage({
       </Link>
     </section>
   );
+}
+
+/** Render a compact QC report to guide analysis failure recovery. */
+function FailureQualityReport({ quality }: { quality: QualityScore }): React.JSX.Element {
+  return (
+    <div className="rounded-md border border-red-200 bg-white p-3 text-red-900">
+      <h4 className="font-semibold">Capture quality report</h4>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="flex justify-between gap-3">
+          <dt>Detection rate</dt>
+          <dd className="font-medium">{quality.detectionRate.toFixed(0)}%</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Mean confidence</dt>
+          <dd className="font-medium">{quality.meanConfidence.toFixed(2)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Step count</dt>
+          <dd className="font-medium">{String(quality.stepCount)}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt>Occlusion rate</dt>
+          <dd className="font-medium">{quality.occlusionRate.toFixed(0)}%</dd>
+        </div>
+      </dl>
+      {quality.warnings.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-1 pl-5">
+          {quality.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3">No QC warnings were generated. Retry analysis before retaking video.</p>
+      )}
+    </div>
+  );
+}
+
+/** Convert analysis failures into actionable recovery text. */
+function createAnalysisErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('patient record')) {
+    return 'Patient data could not be loaded. Return to the patient list and start the assessment again.';
+  }
+
+  if (normalized.includes('worker')) {
+    return 'Analysis worker failed to start. Reload the app and retry analysis.';
+  }
+
+  if (normalized.includes('not enough') || normalized.includes('insufficient')) {
+    return 'The capture does not contain enough usable gait data. Review the quality report and retake the video if needed.';
+  }
+
+  return 'Analysis could not be completed. Review the quality report, retry analysis, or retake the capture.';
 }

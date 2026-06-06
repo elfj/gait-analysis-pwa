@@ -65,6 +65,22 @@ describe('CapturePage', () => {
     expect(screen.getByText('1.0 s')).toBeDefined();
   });
 
+  it('shows an actionable message when camera permission is denied', async () => {
+    fakeStart.mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'));
+
+    renderCapturePage();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Start recording' }));
+
+    expect(await screen.findByText('Capture needs attention')).toBeDefined();
+    expect(
+      screen.getByText(
+        'Camera access was denied. Allow camera permission in the browser settings, then try again.',
+      ),
+    ).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeDefined();
+  });
+
   it('stops capture, stores sequence, and navigates to analyzing', async () => {
     fakeStart.mockResolvedValueOnce();
 

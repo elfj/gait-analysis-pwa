@@ -1,4 +1,4 @@
-import { Camera, CircleStop, Play, Ruler } from 'lucide-react';
+import { AlertTriangle, Camera, CircleStop, Play, RotateCcw, Ruler } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -50,7 +50,7 @@ export function CapturePage({
       await cameraRef.current?.start();
       setIsRecording(true);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to start camera.');
+      setErrorMessage(createCameraErrorMessage(error));
       setIsRecording(false);
     }
   }
@@ -129,7 +129,7 @@ export function CapturePage({
           <CameraComponent
             className="rounded-md border border-slate-200 bg-white p-3"
             onError={(error) => {
-              setErrorMessage(error.message);
+              setErrorMessage(createCameraErrorMessage(error));
             }}
             onPoseFrame={handlePoseFrame}
             ref={cameraRef}
@@ -137,7 +137,21 @@ export function CapturePage({
 
           {errorMessage ? (
             <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-              {errorMessage}
+              <h3 className="flex items-center gap-2 font-semibold">
+                <AlertTriangle aria-hidden="true" className="h-4 w-4" />
+                Capture needs attention
+              </h3>
+              <p className="mt-2">{errorMessage}</p>
+              <button
+                className="mt-3 inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
+                onClick={() => {
+                  void handleStart();
+                }}
+                type="button"
+              >
+                <RotateCcw aria-hidden="true" className="h-4 w-4" />
+                Try again
+              </button>
             </div>
           ) : null}
         </div>
@@ -169,6 +183,41 @@ export function CapturePage({
       </div>
     </section>
   );
+}
+
+/** Convert camera and pose startup failures into actionable user messages. */
+function createCameraErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const name = error instanceof DOMException ? error.name : '';
+  const normalized = `${name} ${message}`.toLowerCase();
+
+  if (
+    normalized.includes('notallowed') ||
+    normalized.includes('permission') ||
+    normalized.includes('denied')
+  ) {
+    return 'Camera access was denied. Allow camera permission in the browser settings, then try again.';
+  }
+
+  if (
+    normalized.includes('notfound') ||
+    normalized.includes('no camera') ||
+    normalized.includes('device not found')
+  ) {
+    return 'No camera was found. Connect a camera or open this page on a phone with a rear camera.';
+  }
+
+  if (
+    normalized.includes('mediapipe') ||
+    normalized.includes('pose') ||
+    normalized.includes('wasm') ||
+    normalized.includes('task') ||
+    normalized.includes('model')
+  ) {
+    return 'Pose detection could not load. Check the network connection, then try again.';
+  }
+
+  return 'Unable to start camera capture. Check camera permission and device availability, then try again.';
 }
 
 /** Builds a pose sequence from captured frames. */

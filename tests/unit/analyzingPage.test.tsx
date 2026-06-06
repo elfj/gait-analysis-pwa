@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -70,6 +71,27 @@ describe('AnalyzingPage', () => {
 
     expect(await screen.findByText('Analysis failed')).toBeDefined();
     expect(screen.getByText('No captured pose sequence is available.')).toBeDefined();
+  });
+
+  it('shows quality guidance and allows retry when analysis fails', async () => {
+    const analyze = vi.fn(() => Promise.reject(new Error('insufficient gait events')));
+
+    useAssessmentStore.getState().setCapturedSequence(sequence);
+    renderAnalyzingPage({
+      analyze,
+      repository: createRepository(),
+    });
+
+    expect(await screen.findByText('Analysis failed')).toBeDefined();
+    expect(screen.getByText('Capture quality report')).toBeDefined();
+    expect(screen.getByText('Detection rate')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Retry analysis' })).toBeDefined();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry analysis' }));
+
+    await waitFor(() => {
+      expect(analyze).toHaveBeenCalledTimes(2);
+    });
   });
 });
 
