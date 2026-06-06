@@ -1,1 +1,1 @@
-export {};
+export { LANDMARK } from '@/types/pose';

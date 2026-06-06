@@ -35,10 +35,10 @@ pnpm build
 
 ## MediaPipe Model
 
-The pose model will be added in Task 2.1:
+Task 2.1 adds the full MediaPipe pose landmarker model:
 
 `public/models/pose_landmarker_full.task`
 
-Source URL to document during Task 2.1:
+Source URL:
 
 `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task`
