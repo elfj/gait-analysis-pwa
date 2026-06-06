@@ -116,8 +116,9 @@ function computeStepLengthAtHeelStrike(
   const oppositeIndex = event.side === 'left' ? LANDMARK.RIGHT_ANKLE : LANDMARK.LEFT_ANKLE;
   const landing = getMetricLandmark(frame, landingIndex, patient);
   const opposite = getMetricLandmark(frame, oppositeIndex, patient);
+  const axis = hasWorldLandmarks(frame) ? 'z' : 'x';
 
-  return Math.abs(landing.x - opposite.x);
+  return Math.abs(landing[axis] - opposite[axis]);
 }
 
 /** Estimates stance phase as heel-strike to toe-off over the same-side stride. */
@@ -175,20 +176,26 @@ function computeStanceIntervals(events: GaitEvent[], side: 'left' | 'right'): [n
   const sideEvents = events
     .filter((event) => event.side === side)
     .sort((a, b) => a.timestampMs - b.timestampMs);
+  const heelStrikes = sideEvents.filter((event) => event.type === 'heel_strike');
   const intervals: [number, number][] = [];
 
-  for (const event of sideEvents) {
-    if (event.type !== 'heel_strike') {
+  for (let index = 0; index < heelStrikes.length - 1; index += 1) {
+    const heelStrike = heelStrikes[index];
+    const nextHeelStrike = heelStrikes[index + 1];
+
+    if (!heelStrike || !nextHeelStrike) {
       continue;
     }
 
     const toeOff = sideEvents.find(
       (candidate) =>
-        candidate.type === 'toe_off' && candidate.timestampMs > event.timestampMs,
+        candidate.type === 'toe_off' &&
+        candidate.timestampMs > heelStrike.timestampMs &&
+        candidate.timestampMs < nextHeelStrike.timestampMs,
     );
 
     if (toeOff) {
-      intervals.push([event.timestampMs, toeOff.timestampMs]);
+      intervals.push([heelStrike.timestampMs, toeOff.timestampMs]);
     }
   }
 
@@ -213,11 +220,17 @@ function computeStepWidth(
     const frame = getFrame(seq, event.frameIndex);
     const left = getMetricLandmark(frame, LANDMARK.LEFT_ANKLE, patient);
     const right = getMetricLandmark(frame, LANDMARK.RIGHT_ANKLE, patient);
+    const axis = hasWorldLandmarks(frame) ? 'x' : 'z';
 
-    return Math.abs(left.z - right.z);
+    return Math.abs(left[axis] - right[axis]);
   });
 
   return meanOrNaN(widths);
+}
+
+/** Returns true when metric MediaPipe world landmarks are available. */
+function hasWorldLandmarks(frame: PoseFrame): boolean {
+  return frame.worldLandmarks !== undefined;
 }
 
 /** Returns a frame by clamped index so event boundaries remain safe. */
@@ -269,14 +282,16 @@ function meanOrNaN(values: number[]): number {
 
 /** Computes coefficient of variation as a percentage. */
 function coefficientOfVariationPct(values: number[]): number {
-  const mean = meanOrNaN(values);
+  const validValues = values.filter(Number.isFinite);
+  const mean = meanOrNaN(validValues);
 
-  if (!Number.isFinite(mean) || mean === 0) {
+  if (!Number.isFinite(mean) || mean === 0 || validValues.length < 2) {
     return Number.NaN;
   }
 
   const variance =
-    values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+    validValues.reduce((sum, value) => sum + (value - mean) ** 2, 0) /
+    (validValues.length - 1);
 
   return (Math.sqrt(variance) / mean) * 100;
 }

@@ -59,17 +59,60 @@ function extractInvertedY(
   frames: PoseFrame[],
   landmarkIndex: number,
 ): number[] {
-  return frames.map((frame, frameIndex) => {
+  const rawSignal = frames.map((frame) => {
     const landmark = frame.landmarks[landmarkIndex];
 
     if (landmark === undefined) {
-      throw new Error(
-        `Missing landmark ${String(landmarkIndex)} in frame ${String(frameIndex)}.`,
-      );
+      return Number.NaN;
     }
 
     return -landmark.y;
   });
+
+  return fillMissingSamples(rawSignal);
+}
+
+/** Linearly fills missing samples so isolated dropped landmarks do not crash analysis. */
+function fillMissingSamples(signal: number[]): number[] {
+  const finiteEntries = signal
+    .map((value, index) => ({ index, value }))
+    .filter((entry) => Number.isFinite(entry.value));
+
+  if (finiteEntries.length === 0) {
+    return signal.map(() => 0);
+  }
+
+  return signal.map((value, index) => {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const previous = findPreviousFinite(finiteEntries, index);
+    const next = findNextFinite(finiteEntries, index);
+
+    if (previous && next) {
+      const fraction = (index - previous.index) / (next.index - previous.index);
+      return previous.value + (next.value - previous.value) * fraction;
+    }
+
+    return previous?.value ?? next?.value ?? 0;
+  });
+}
+
+/** Finds the nearest finite sample before an index. */
+function findPreviousFinite(
+  entries: { index: number; value: number }[],
+  index: number,
+): { index: number; value: number } | undefined {
+  return entries.findLast((entry) => entry.index < index);
+}
+
+/** Finds the nearest finite sample after an index. */
+function findNextFinite(
+  entries: { index: number; value: number }[],
+  index: number,
+): { index: number; value: number } | undefined {
+  return entries.find((entry) => entry.index > index);
 }
 
 /** Detect toe-off derivative zero crossings after heel strikes. */

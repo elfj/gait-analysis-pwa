@@ -70,6 +70,25 @@ describe('computeSpatiotemporal', () => {
       'Patient height must be positive.',
     );
   });
+
+  it('does not pair a missed toe-off across multiple strides for double support', () => {
+    const seq = createSyntheticSequence(true);
+    const events: GaitEvent[] = [
+      createEvent('left', 'heel_strike', 0),
+      createEvent('right', 'heel_strike', 10),
+      createEvent('right', 'toe_off', 20),
+      createEvent('left', 'heel_strike', 30),
+      createEvent('right', 'heel_strike', 40),
+      createEvent('left', 'toe_off', 45),
+      createEvent('right', 'toe_off', 50),
+      createEvent('left', 'heel_strike', 60),
+      createEvent('right', 'heel_strike', 70),
+    ];
+
+    const metrics = computeSpatiotemporal(seq, events, patient);
+
+    expect(metrics.doubleSupportPct).toBeLessThan(5);
+  });
 });
 
 /** Creates a deterministic sagittal walking sequence for golden-style tests. */
@@ -86,17 +105,17 @@ function createSyntheticSequence(includeWorldLandmarks: boolean): PoseSequence {
     if (leftHeelStrikes.has(frameIndex)) {
       setAnklePositions(landmarks, 0.4, 0.0, 0.06);
       if (worldLandmarks) {
-        setAnklePositions(worldLandmarks, 0.65, 0.0, 0.06);
+        setWorldAnklePositions(worldLandmarks, 0.65, 0.0, 0.06);
       }
     } else if (rightHeelStrikes.has(frameIndex)) {
       setAnklePositions(landmarks, 0.0, 0.38823529411764707, 0.06);
       if (worldLandmarks) {
-        setAnklePositions(worldLandmarks, 0.0, 0.64, 0.06);
+        setWorldAnklePositions(worldLandmarks, 0.0, 0.64, 0.06);
       }
     } else {
       setAnklePositions(landmarks, 0.18, 0.16, 0.06);
       if (worldLandmarks) {
-        setAnklePositions(worldLandmarks, 0.3, 0.25, 0.06);
+        setWorldAnklePositions(worldLandmarks, 0.3, 0.25, 0.06);
       }
     }
 
@@ -188,6 +207,27 @@ function setAnklePositions(
     x: rightProgression,
     y: 0,
     z: -halfWidth,
+    visibility: 0.95,
+  };
+}
+
+/** Assigns world-coordinate ankle positions using z as progression and x as width. */
+function setWorldAnklePositions(
+  landmarks: Landmark3D[],
+  leftProgression: number,
+  rightProgression: number,
+  halfWidth: number,
+): void {
+  landmarks[LANDMARK.LEFT_ANKLE] = {
+    x: halfWidth,
+    y: 0,
+    z: leftProgression,
+    visibility: 0.95,
+  };
+  landmarks[LANDMARK.RIGHT_ANKLE] = {
+    x: -halfWidth,
+    y: 0,
+    z: rightProgression,
     visibility: 0.95,
   };
 }

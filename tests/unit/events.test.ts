@@ -140,6 +140,22 @@ describe('detectGaitEvents', () => {
     ).toBe(true);
   });
 
+  it('tolerates an isolated missing landmark without crashing', () => {
+    const sequence = createSequence();
+    const frame = sequence.frames[45];
+
+    expect(frame).toBeDefined();
+
+    if (frame) {
+      const mutableLandmarks: (Landmark3D | undefined)[] = frame.landmarks;
+      mutableLandmarks[LANDMARK.LEFT_HEEL] = undefined;
+    }
+
+    const events = detectGaitEvents(sequence);
+
+    expect(events.filter((event) => event.type === 'heel_strike').length).toBeGreaterThan(0);
+  });
+
   it('returns no events for an empty sequence', () => {
     expect(
       detectGaitEvents({

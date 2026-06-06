@@ -34,7 +34,7 @@ export function angleBetween3Points(
   return (Math.acos(cosine) * 180) / Math.PI;
 }
 
-/** Apply a zero-phase four-pass low-pass filter to a numeric signal. */
+/** Apply a zero-phase eight-pass low-pass filter to a numeric signal. */
 export function lowPassFilter(
   signal: number[],
   cutoffHz: number,
@@ -104,7 +104,7 @@ export function findPeaks(
       current === undefined ||
       next === undefined ||
       current <= previous ||
-      current < next
+      current <= next
     ) {
       continue;
     }

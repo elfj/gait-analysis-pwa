@@ -10,45 +10,46 @@ import type { PoseSequence } from '../../types/pose';
 /**
  * Runs the complete MVP gait analysis pipeline for one 10MWT pose sequence.
  */
-export async function analyzeGait(
+export function analyzeGait(
   sequence: PoseSequence,
   patient: Patient,
 ): Promise<GaitAnalysisResult> {
-  await Promise.resolve();
+  return Promise.resolve().then(() => {
+    const quality = computeQualityScore(sequence, patient.heightCm);
+    const events = detectGaitEvents(sequence);
 
-  const quality = computeQualityScore(sequence, patient.heightCm);
-  const events = detectGaitEvents(sequence);
+    if (events.filter((event) => event.type === 'heel_strike').length < 2) {
+      throw new Error('At least two heel-strike events are required for gait analysis.');
+    }
 
-  if (events.filter((event) => event.type === 'heel_strike').length < 2) {
-    throw new Error('At least two heel-strike events are required for gait analysis.');
-  }
+    const spatiotemporal = computeSpatiotemporal(sequence, events, patient);
+    const kinematics = computeKinematicMetrics(sequence, events);
+    const symmetry = computeSymmetryMetrics(spatiotemporal, kinematics);
 
-  const spatiotemporal = computeSpatiotemporal(sequence, events, patient);
-  const kinematics = computeKinematicMetrics(sequence, events);
-  const symmetry = computeSymmetryMetrics(spatiotemporal, kinematics);
-
-  return {
-    assessmentId: createAssessmentId(sequence, patient),
-    patientId: patient.id,
-    testType: '10MWT',
-    performedAt: sequence.capturedAt,
-    quality,
-    spatiotemporal,
-    kinematics,
-    symmetry,
-    events,
-    confidenceFlags: createConfidenceFlags(quality.warnings),
-  };
+    return {
+      assessmentId: createAssessmentId(sequence, patient),
+      patientId: patient.id,
+      testType: '10MWT',
+      performedAt: sequence.capturedAt,
+      quality,
+      spatiotemporal,
+      kinematics,
+      symmetry,
+      events,
+      confidenceFlags: createConfidenceFlags(quality.warnings),
+    };
+  });
 }
 
 /** Creates a deterministic assessment identifier for local-only analysis. */
 function createAssessmentId(sequence: PoseSequence, patient: Patient): string {
   const capturedAtMs = Date.parse(sequence.capturedAt);
-  const suffix = Number.isFinite(capturedAtMs)
+  const timestampPart = Number.isFinite(capturedAtMs)
     ? String(capturedAtMs)
     : String(sequence.frames.length);
+  const uniquePart = globalThis.crypto.randomUUID();
 
-  return `${patient.id}-${suffix}`;
+  return `${patient.id}-${timestampPart}-${uniquePart}`;
 }
 
 /** Converts human-readable quality warnings into machine-readable flags. */

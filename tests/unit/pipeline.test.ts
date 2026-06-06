@@ -27,7 +27,7 @@ describe('analyzeGait', () => {
     const elapsedMs = performance.now() - startedAt;
 
     expect(elapsedMs).toBeLessThan(5000);
-    expect(result.assessmentId).toBe('patient-pipeline-1767225600000');
+    expect(result.assessmentId).toMatch(/^patient-pipeline-1767225600000-/);
     expect(result.patientId).toBe(patient.id);
     expect(result.testType).toBe('10MWT');
     expect(result.quality.passed).toBe(true);
@@ -38,6 +38,13 @@ describe('analyzeGait', () => {
     expect(result.kinematics.cyclePlots.kneeLeft).toHaveLength(101);
     expect(result.symmetry.overallAsymmetryScore).toBeLessThan(15);
     expect(result.confidenceFlags).toEqual([]);
+  });
+
+  it('creates distinct assessment IDs for repeated analyses with the same timestamp', async () => {
+    const first = await analyzeGait(createPipelineSequence(), patient);
+    const second = await analyzeGait(createPipelineSequence(), patient);
+
+    expect(first.assessmentId).not.toBe(second.assessmentId);
   });
 
   it('throws when events are insufficient for analysis', async () => {
@@ -148,13 +155,13 @@ function setStepTrajectory(worldLandmarks: Landmark3D[], phase: number): void {
 
   worldLandmarks[LANDMARK.LEFT_ANKLE] = {
     ...leftAnkle,
-    x: halfStepLength,
-    z: 0.06,
+    x: 0.06,
+    z: halfStepLength,
   };
   worldLandmarks[LANDMARK.RIGHT_ANKLE] = {
     ...rightAnkle,
-    x: -halfStepLength,
-    z: -0.06,
+    x: -0.06,
+    z: -halfStepLength,
   };
 }
 
