@@ -32,7 +32,7 @@ describe('ResultPage', () => {
     ).toBeDefined();
     expect(screen.getByText('10MWT Gait Analysis Report')).toBeDefined();
     expect(
-      screen.getByText('本報告為臨床決策輔助，不應作為唯一診斷依據。'),
+      screen.getByText(/This report supports clinical decision-making/),
     ).toBeDefined();
     expect(screen.getByText('1.23')).toBeDefined();
     expect(screen.getByText('112')).toBeDefined();

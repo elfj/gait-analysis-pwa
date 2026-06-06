@@ -5,6 +5,7 @@ import type { Landmark3D, PoseFrame, PoseSequence } from '../../types/pose';
 
 const MS_PER_SECOND = 1000;
 const MS_PER_MINUTE = 60000;
+type HorizontalAxis = 'x' | 'z';
 
 /**
  * Computes clinically interpretable temporal and spatial walking metrics from
@@ -31,13 +32,26 @@ export function computeSpatiotemporal(
   const allStrideTimes = [...strideTimesLeft, ...strideTimesRight];
   const strideTimeMean = meanOrNaN(allStrideTimes);
   const strideTimeCV = coefficientOfVariationPct(allStrideTimes);
-  const stepLengthLeft = computeMeanStepLength(seq, heelStrikes, 'left', patient);
-  const stepLengthRight = computeMeanStepLength(seq, heelStrikes, 'right', patient);
+  const spatialAxes = inferSpatialAxes(seq, heelStrikes, patient);
+  const stepLengthLeft = computeMeanStepLength(
+    seq,
+    heelStrikes,
+    'left',
+    patient,
+    spatialAxes.progression,
+  );
+  const stepLengthRight = computeMeanStepLength(
+    seq,
+    heelStrikes,
+    'right',
+    patient,
+    spatialAxes.progression,
+  );
   const gaitSpeed = ((stepLengthLeft + stepLengthRight) / 2) * (cadence / 60);
   const stancePhasePctLeft = computeStancePhasePct(events, 'left');
   const stancePhasePctRight = computeStancePhasePct(events, 'right');
   const doubleSupportPct = computeDoubleSupportPct(events, seq.durationMs);
-  const stepWidth = computeStepWidth(seq, heelStrikes, patient);
+  const stepWidth = computeStepWidth(seq, heelStrikes, patient, spatialAxes.width);
 
   return {
     cadence,
@@ -96,10 +110,13 @@ function computeMeanStepLength(
   heelStrikes: GaitEvent[],
   side: 'left' | 'right',
   patient: Patient,
+  progressionAxis: HorizontalAxis,
 ): number {
   const sideHeelStrikes = heelStrikes.filter((event) => event.side === side);
   const lengths = sideHeelStrikes
-    .map((event) => computeStepLengthAtHeelStrike(seq, event, patient))
+    .map((event) =>
+      computeStepLengthAtHeelStrike(seq, event, patient, progressionAxis),
+    )
     .filter(Number.isFinite);
 
   return meanOrNaN(lengths);
@@ -110,15 +127,15 @@ function computeStepLengthAtHeelStrike(
   seq: PoseSequence,
   event: GaitEvent,
   patient: Patient,
+  progressionAxis: HorizontalAxis,
 ): number {
   const frame = getFrame(seq, event.frameIndex);
   const landingIndex = event.side === 'left' ? LANDMARK.LEFT_ANKLE : LANDMARK.RIGHT_ANKLE;
   const oppositeIndex = event.side === 'left' ? LANDMARK.RIGHT_ANKLE : LANDMARK.LEFT_ANKLE;
   const landing = getMetricLandmark(frame, landingIndex, patient);
   const opposite = getMetricLandmark(frame, oppositeIndex, patient);
-  const axis = hasWorldLandmarks(frame) ? 'z' : 'x';
 
-  return Math.abs(landing[axis] - opposite[axis]);
+  return Math.abs(landing[progressionAxis] - opposite[progressionAxis]);
 }
 
 /** Estimates stance phase as heel-strike to toe-off over the same-side stride. */
@@ -215,22 +232,46 @@ function computeStepWidth(
   seq: PoseSequence,
   heelStrikes: GaitEvent[],
   patient: Patient,
+  widthAxis: HorizontalAxis,
 ): number {
   const widths = heelStrikes.map((event) => {
     const frame = getFrame(seq, event.frameIndex);
     const left = getMetricLandmark(frame, LANDMARK.LEFT_ANKLE, patient);
     const right = getMetricLandmark(frame, LANDMARK.RIGHT_ANKLE, patient);
-    const axis = hasWorldLandmarks(frame) ? 'x' : 'z';
-
-    return Math.abs(left[axis] - right[axis]);
+    return Math.abs(left[widthAxis] - right[widthAxis]);
   });
 
   return meanOrNaN(widths);
 }
 
-/** Returns true when metric MediaPipe world landmarks are available. */
-function hasWorldLandmarks(frame: PoseFrame): boolean {
-  return frame.worldLandmarks !== undefined;
+/** Infer sagittal progression and lateral-width axes from heel-strike ankle separation. */
+function inferSpatialAxes(
+  seq: PoseSequence,
+  heelStrikes: GaitEvent[],
+  patient: Patient,
+): { progression: HorizontalAxis; width: HorizontalAxis } {
+  const axisSeparations = { x: 0, z: 0 };
+  let validSamples = 0;
+
+  for (const event of heelStrikes) {
+    const frame = getFrame(seq, event.frameIndex);
+    const left = getMetricLandmark(frame, LANDMARK.LEFT_ANKLE, patient);
+    const right = getMetricLandmark(frame, LANDMARK.RIGHT_ANKLE, patient);
+
+    axisSeparations.x += Math.abs(left.x - right.x);
+    axisSeparations.z += Math.abs(left.z - right.z);
+    validSamples += 1;
+  }
+
+  if (validSamples === 0) {
+    return { progression: 'x', width: 'z' };
+  }
+
+  const progression = axisSeparations.x >= axisSeparations.z ? 'x' : 'z';
+  return {
+    progression,
+    width: progression === 'x' ? 'z' : 'x',
+  };
 }
 
 /** Returns a frame by clamped index so event boundaries remain safe. */

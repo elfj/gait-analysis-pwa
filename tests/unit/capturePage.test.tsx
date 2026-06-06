@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CameraViewHandle, CameraViewProps } from '../../src/components/CameraView';
 import { CapturePage } from '../../src/pages/CapturePage';
 import { useAssessmentStore } from '../../src/stores/assessmentStore';
-import type { PoseFrame } from '../../src/types/pose';
+import type { PoseFrame, PoseSequence } from '../../src/types/pose';
 
 const poseFrame: PoseFrame = {
   landmarks: Array.from({ length: 33 }, (_, index) => ({
@@ -23,6 +23,13 @@ const poseFrame: PoseFrame = {
 
 const fakeStart = vi.fn<() => Promise<void>>();
 const fakeStop = vi.fn<() => void>();
+const fakePersistPoseSequence = vi.fn<
+  (record: {
+    assessmentId: string;
+    data: PoseSequence;
+    id: string;
+  }) => Promise<string>
+>();
 
 const FakeCameraView = forwardRef<CameraViewHandle, CameraViewProps>(
   function FakeCameraView({ onPoseFrame }, ref): React.JSX.Element {
@@ -50,11 +57,13 @@ describe('CapturePage', () => {
     cleanup();
     fakeStart.mockReset();
     fakeStop.mockReset();
+    fakePersistPoseSequence.mockReset();
     useAssessmentStore.getState().clearCapturedSequence();
   });
 
   it('starts capture and updates recording summary', async () => {
     fakeStart.mockResolvedValueOnce();
+    fakePersistPoseSequence.mockResolvedValue('draft:assessment-1');
 
     renderCapturePage();
 
@@ -67,6 +76,7 @@ describe('CapturePage', () => {
 
   it('shows an actionable message when camera permission is denied', async () => {
     fakeStart.mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'));
+    fakePersistPoseSequence.mockResolvedValue('draft:assessment-1');
 
     renderCapturePage();
 
@@ -83,6 +93,7 @@ describe('CapturePage', () => {
 
   it('stops capture, stores sequence, and navigates to analyzing', async () => {
     fakeStart.mockResolvedValueOnce();
+    fakePersistPoseSequence.mockResolvedValue('draft:assessment-1');
 
     renderCapturePage();
 
@@ -93,6 +104,13 @@ describe('CapturePage', () => {
       expect(screen.getByText('Analyzing route')).toBeDefined();
     });
     expect(fakeStop).toHaveBeenCalledTimes(1);
+    expect(fakePersistPoseSequence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assessmentId: 'assessment-1',
+        id: 'draft:assessment-1',
+      }),
+    );
+    expect(fakePersistPoseSequence.mock.calls[0]?.[0].data.frames).toEqual([poseFrame]);
     expect(useAssessmentStore.getState().capturedSequence?.frames).toEqual([poseFrame]);
   });
 });
@@ -104,7 +122,12 @@ function renderCapturePage(): void {
       <Routes>
         <Route
           path="/assessment/:id/capture"
-          element={<CapturePage CameraComponent={FakeCameraView} />}
+          element={
+            <CapturePage
+              CameraComponent={FakeCameraView}
+              persistPoseSequence={fakePersistPoseSequence}
+            />
+          }
         />
         <Route
           path="/assessment/:id/analyzing"

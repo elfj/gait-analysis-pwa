@@ -37,8 +37,8 @@ function detectSideEvents(seq: PoseSequence, side: GaitSide): GaitEvent[] {
   const toeIndex =
     side === 'left' ? LANDMARK.LEFT_FOOT_INDEX : LANDMARK.RIGHT_FOOT_INDEX;
   const minDistance = Math.max(1, Math.floor(seq.fps * 0.4));
-  const heelY = extractInvertedY(seq.frames, heelIndex);
-  const toeY = extractInvertedY(seq.frames, toeIndex);
+  const heelY = extractImageY(seq.frames, heelIndex);
+  const toeY = extractImageY(seq.frames, toeIndex);
   const heelYFiltered = lowPassFilter(heelY, 6, seq.fps);
   const toeYFiltered = lowPassFilter(toeY, 6, seq.fps);
   const heelStrikeFrames = findPeaks(
@@ -54,8 +54,8 @@ function detectSideEvents(seq: PoseSequence, side: GaitSide): GaitEvent[] {
   return [...heelStrikes, ...toeOffs];
 }
 
-/** Extract an inverted image-space y trajectory for one landmark. */
-function extractInvertedY(
+/** Extract an image-space y trajectory for one landmark. */
+function extractImageY(
   frames: PoseFrame[],
   landmarkIndex: number,
 ): number[] {
@@ -66,7 +66,7 @@ function extractInvertedY(
       return Number.NaN;
     }
 
-    return -landmark.y;
+    return landmark.y;
   });
 
   return fillMissingSamples(rawSignal);
@@ -144,7 +144,7 @@ function detectToeOffs(
       heelStrikeFrames[index + 1] ?? seq.frames.length - 1;
     const searchStart = heelStrikeFrame + minDelayFrames;
     const searchEnd = Math.max(searchStart, nextHeelStrikeFrame - 1);
-    const toeOffFrame = findFirstNegativeToPositiveCrossing(
+  const toeOffFrame = findFirstPositiveToNegativeCrossing(
       toeVelocity,
       searchStart,
       searchEnd,
@@ -158,8 +158,8 @@ function detectToeOffs(
   return events;
 }
 
-/** Find the first derivative crossing from negative to non-negative. */
-function findFirstNegativeToPositiveCrossing(
+/** Find the first derivative crossing from positive to non-positive. */
+function findFirstPositiveToNegativeCrossing(
   signal: number[],
   startFrame: number,
   endFrame: number,
@@ -179,7 +179,7 @@ function findFirstNegativeToPositiveCrossing(
       continue;
     }
 
-    if (previous < 0 && current >= 0) {
+    if (previous > 0 && current <= 0) {
       return frameIndex;
     }
   }

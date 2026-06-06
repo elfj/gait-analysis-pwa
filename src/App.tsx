@@ -1,4 +1,4 @@
-import { Activity, FilePlus2, Home, Menu, Settings } from 'lucide-react';
+import { Activity, FilePlus2, Home, Settings } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 const navItems = [
@@ -11,7 +11,7 @@ function App(): React.JSX.Element {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-5 py-4 sm:px-8 md:flex-row md:items-center md:justify-between">
           <NavLink aria-label="Gait Analysis home" className="flex items-center gap-3" to="/">
             <span className="flex h-10 w-10 items-center justify-center rounded-md bg-teal-700 text-white">
               <Activity aria-hidden="true" className="h-5 w-5" />
@@ -24,7 +24,7 @@ function App(): React.JSX.Element {
             </div>
           </NavLink>
 
-          <nav aria-label="Primary navigation" className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Primary navigation" className="flex flex-wrap items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
 
@@ -48,13 +48,6 @@ function App(): React.JSX.Element {
             })}
           </nav>
 
-          <button
-            aria-label="Open navigation menu"
-            className="rounded-md border border-slate-200 p-2 text-slate-700 md:hidden"
-            type="button"
-          >
-            <Menu aria-hidden="true" className="h-5 w-5" />
-          </button>
         </div>
       </header>
 

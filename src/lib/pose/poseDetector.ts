@@ -5,8 +5,7 @@ import type {
 } from '@mediapipe/tasks-vision';
 import type { Landmark3D, PoseFrame } from '@/types/pose';
 
-const DEFAULT_WASM_BASE_URL =
-  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm';
+const DEFAULT_WASM_BASE_URL = '/wasm';
 const DEFAULT_MODEL_ASSET_PATH = '/models/pose_landmarker_full.task';
 
 /** Configuration for MediaPipe Pose detector initialization. */

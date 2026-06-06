@@ -60,7 +60,28 @@ describe('AnalyzingPage', () => {
       }),
     );
     expect(repository.saveResult).toHaveBeenCalledWith(result);
+    expect(repository.deletePoseSequence).toHaveBeenCalledWith('draft:patient-1');
     expect(useAssessmentStore.getState().capturedSequence).toBeNull();
+  });
+
+  it('recovers a captured sequence from local persistence when memory state is empty', async () => {
+    const result = createResultFixture();
+    const analyze = vi.fn(() => Promise.resolve(result));
+    const repository = createRepository();
+
+    repository.getPoseSequenceByAssessment.mockResolvedValueOnce({
+      assessmentId: patient.id,
+      data: sequence,
+      id: 'draft:patient-1',
+    });
+    renderAnalyzingPage({ analyze, repository });
+
+    await waitFor(() => {
+      expect(screen.getByText('Result route')).toBeDefined();
+    });
+    expect(repository.getPoseSequenceByAssessment).toHaveBeenCalledWith(patient.id);
+    expect(analyze).toHaveBeenCalledWith(sequence, patient);
+    expect(repository.deletePoseSequence).toHaveBeenCalledWith('draft:patient-1');
   });
 
   it('shows an error when no captured sequence is available', async () => {
@@ -123,18 +144,34 @@ function renderAnalyzingPage({
 function createRepository(): AnalyzingPageRepository & {
   createAssessment: ReturnType<typeof vi.fn<(assessment: Assessment) => Promise<string>>>;
   getPatient: ReturnType<typeof vi.fn<(patientId: string) => Promise<Patient | undefined>>>;
+  getPoseSequenceByAssessment: ReturnType<
+    typeof vi.fn<
+      (
+        assessmentId: string,
+      ) => Promise<{ assessmentId: string; data: PoseSequence; id: string } | undefined>
+    >
+  >;
   savePoseSequence: ReturnType<
     typeof vi.fn<
       (record: { assessmentId: string; data: PoseSequence; id: string }) => Promise<string>
     >
   >;
   saveResult: ReturnType<typeof vi.fn<(result: GaitAnalysisResult) => Promise<string>>>;
+  deletePoseSequence: ReturnType<typeof vi.fn<(recordId: string) => Promise<void>>>;
 } {
   return {
     createAssessment: vi.fn((assessment: Assessment) => Promise.resolve(assessment.id)),
+    deletePoseSequence: vi.fn((recordId: string) => {
+      void recordId;
+      return Promise.resolve();
+    }),
     getPatient: vi.fn((patientId: string) =>
       Promise.resolve(patientId === patient.id ? patient : undefined),
     ),
+    getPoseSequenceByAssessment: vi.fn((assessmentId: string) => {
+      void assessmentId;
+      return Promise.resolve(undefined);
+    }),
     savePoseSequence: vi.fn((record) => Promise.resolve(record.id)),
     saveResult: vi.fn((result: GaitAnalysisResult) => Promise.resolve(result.assessmentId)),
   };

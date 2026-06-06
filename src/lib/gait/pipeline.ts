@@ -18,13 +18,12 @@ export function analyzeGait(
     const quality = computeQualityScore(sequence, patient.heightCm);
     const events = detectGaitEvents(sequence);
 
-    if (events.filter((event) => event.type === 'heel_strike').length < 2) {
-      throw new Error('At least two heel-strike events are required for gait analysis.');
-    }
+    validateEventsForAnalysis(events);
 
     const spatiotemporal = computeSpatiotemporal(sequence, events, patient);
     const kinematics = computeKinematicMetrics(sequence, events);
     const symmetry = computeSymmetryMetrics(spatiotemporal, kinematics);
+    validateFiniteMetrics(spatiotemporal, symmetry.overallAsymmetryScore);
 
     return {
       assessmentId: createAssessmentId(sequence, patient),
@@ -39,6 +38,61 @@ export function analyzeGait(
       confidenceFlags: createConfidenceFlags(quality.warnings),
     };
   });
+}
+
+/** Ensure detected events support stride, stance, and symmetry metrics. */
+function validateEventsForAnalysis(events: GaitAnalysisResult['events']): void {
+  const heelStrikes = events.filter((event) => event.type === 'heel_strike');
+  const toeOffs = events.filter((event) => event.type === 'toe_off');
+
+  if (heelStrikes.length < 4) {
+    throw new Error('At least four heel-strike events are required for gait analysis.');
+  }
+
+  for (const side of ['left', 'right'] as const) {
+    const sideHeelStrikes = heelStrikes.filter((event) => event.side === side);
+    const sideToeOffs = toeOffs.filter((event) => event.side === side);
+
+    if (sideHeelStrikes.length < 2) {
+      throw new Error(`At least two ${side} heel-strike events are required.`);
+    }
+
+    const hasToeOffWithinStride = sideHeelStrikes.some((heelStrike, index) => {
+      const nextHeelStrike = sideHeelStrikes[index + 1];
+
+      if (!nextHeelStrike) {
+        return false;
+      }
+
+      return sideToeOffs.some(
+        (toeOff) =>
+          toeOff.timestampMs > heelStrike.timestampMs &&
+          toeOff.timestampMs < nextHeelStrike.timestampMs,
+      );
+    });
+
+    if (!hasToeOffWithinStride) {
+      throw new Error(`At least one ${side} toe-off event within a stride is required.`);
+    }
+  }
+}
+
+/** Reject non-finite numeric metrics before the UI can render misleading results. */
+function validateFiniteMetrics(
+  spatiotemporal: GaitAnalysisResult['spatiotemporal'],
+  overallAsymmetryScore: number,
+): void {
+  const metricEntries = Object.entries(spatiotemporal);
+
+  for (const [name, value] of metricEntries) {
+    if (!Number.isFinite(value)) {
+      throw new Error(`Gait metric ${name} is not finite.`);
+    }
+  }
+
+  if (!Number.isFinite(overallAsymmetryScore)) {
+    throw new Error('Overall asymmetry score is not finite.');
+  }
 }
 
 /** Creates a deterministic assessment identifier for local-only analysis. */

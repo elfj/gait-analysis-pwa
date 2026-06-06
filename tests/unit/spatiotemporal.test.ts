@@ -211,7 +211,7 @@ function setAnklePositions(
   };
 }
 
-/** Assigns world-coordinate ankle positions using z as progression and x as width. */
+/** Assigns world-coordinate ankle positions using x as progression and z as width. */
 function setWorldAnklePositions(
   landmarks: Landmark3D[],
   leftProgression: number,
@@ -219,15 +219,15 @@ function setWorldAnklePositions(
   halfWidth: number,
 ): void {
   landmarks[LANDMARK.LEFT_ANKLE] = {
-    x: halfWidth,
+    x: leftProgression,
     y: 0,
-    z: leftProgression,
+    z: halfWidth,
     visibility: 0.95,
   };
   landmarks[LANDMARK.RIGHT_ANKLE] = {
-    x: -halfWidth,
+    x: rightProgression,
     y: 0,
-    z: rightProgression,
+    z: -halfWidth,
     visibility: 0.95,
   };
 }

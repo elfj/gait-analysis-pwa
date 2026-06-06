@@ -96,6 +96,8 @@ https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_
 
 The model is served as a static public asset. If pose initialization fails in production, verify that this file is included in the deployed `public` assets and is reachable at `/models/pose_landmarker_full.task`.
 
+MediaPipe WASM runtime files are served from `public/wasm/` so installed PWAs can initialize pose detection without relying on a third-party CDN at capture time.
+
 ## Project Structure
 
 ```text

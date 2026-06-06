@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   createAssessment,
+  deletePoseSequence,
   getPatient,
+  getPoseSequenceByAssessment,
   savePoseSequence,
   saveResult,
 } from '@/lib/db/repositories';
@@ -11,6 +13,7 @@ import {
   analyzeGaitInWorker,
   type AnalyzeGaitRunner,
 } from '@/lib/gait/analysisRunner';
+import { createDraftPoseSequenceId } from '@/lib/db/draftPoseSequence';
 import { computeQualityScore } from '@/lib/pose/qc';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import type { Assessment } from '@/types/assessment';
@@ -35,6 +38,10 @@ export interface AnalyzingPageRepository {
   createAssessment: (assessment: Assessment) => Promise<string>;
   /** Load patient metadata by identifier. */
   getPatient: (patientId: string) => Promise<Patient | undefined>;
+  /** Load captured pose sequence by assessment identifier. */
+  getPoseSequenceByAssessment: (
+    assessmentId: string,
+  ) => Promise<{ assessmentId: string; data: PoseSequence; id: string } | undefined>;
   /** Persist captured pose sequence. */
   savePoseSequence: (record: {
     assessmentId: string;
@@ -43,6 +50,8 @@ export interface AnalyzingPageRepository {
   }) => Promise<string>;
   /** Persist final gait analysis result. */
   saveResult: (result: GaitAnalysisResult) => Promise<string>;
+  /** Delete a pose sequence record. */
+  deletePoseSequence: (recordId: string) => Promise<void>;
 }
 
 /** Props for analysis page dependency injection. */
@@ -55,7 +64,9 @@ export interface AnalyzingPageProps {
 
 const defaultRepository: AnalyzingPageRepository = {
   createAssessment,
+  deletePoseSequence,
   getPatient,
+  getPoseSequenceByAssessment,
   savePoseSequence,
   saveResult,
 };
@@ -84,14 +95,20 @@ export function AnalyzingPage({
       setActiveStage(analysisStages[0]);
       setErrorMessage(null);
       setFailureQuality(null);
-
-      if (!capturedSequence) {
-        setErrorMessage('No captured pose sequence is available.');
-        setActiveStage(null);
-        return;
-      }
+      let sequenceForAnalysis: PoseSequence | null = null;
 
       try {
+        const storedPoseSequence = capturedSequence
+          ? undefined
+          : await repository.getPoseSequenceByAssessment(patientId);
+        sequenceForAnalysis = capturedSequence ?? storedPoseSequence?.data ?? null;
+
+        if (!sequenceForAnalysis) {
+          setErrorMessage('No captured pose sequence is available.');
+          setActiveStage(null);
+          return;
+        }
+
         const patient = await repository.getPatient(patientId);
 
         if (!patient) {
@@ -108,7 +125,7 @@ export function AnalyzingPage({
           setCompletedStages((current) => [...current, stage]);
         }
 
-        const result = await analyze(capturedSequence, patient);
+        const result = await analyze(sequenceForAnalysis, patient);
 
         await repository.createAssessment({
           id: result.assessmentId,
@@ -118,10 +135,11 @@ export function AnalyzingPage({
         });
         await repository.savePoseSequence({
           assessmentId: result.assessmentId,
-          data: capturedSequence,
+          data: sequenceForAnalysis,
           id: crypto.randomUUID(),
         });
         await repository.saveResult(result);
+        await repository.deletePoseSequence(createDraftPoseSequenceId(patientId));
 
         if (!isMounted) {
           return;
@@ -132,7 +150,11 @@ export function AnalyzingPage({
       } catch (error) {
         if (isMounted) {
           setErrorMessage(createAnalysisErrorMessage(error));
-          setFailureQuality(computeQualityScore(capturedSequence, FALLBACK_QC_HEIGHT_CM));
+          setFailureQuality(
+            sequenceForAnalysis
+              ? computeQualityScore(sequenceForAnalysis, FALLBACK_QC_HEIGHT_CM)
+              : null,
+          );
           setActiveStage(null);
         }
       }
@@ -180,7 +202,7 @@ export function AnalyzingPage({
           </h3>
           <p>{errorMessage}</p>
           {failureQuality ? <FailureQualityReport quality={failureQuality} /> : null}
-          {capturedSequence ? (
+          {failureQuality ? (
             <button
               className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
               onClick={() => {
@@ -192,6 +214,12 @@ export function AnalyzingPage({
               Retry analysis
             </button>
           ) : null}
+          <Link
+            className="ml-3 inline-flex rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
+            to={`/assessment/${patientId}/capture`}
+          >
+            Retake capture
+          </Link>
         </div>
       ) : (
         <p className="text-sm text-slate-600">Analysis is running in a Web Worker.</p>

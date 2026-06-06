@@ -33,8 +33,8 @@ function createFrame(frameIndex: number): PoseFrame {
   const leftToeSignal = -impulseSignal(frameIndex, leftToeOffFrames, 0.18);
   const rightToeSignal = -impulseSignal(frameIndex, rightToeOffFrames, 0.18);
 
-  landmarks[LANDMARK.LEFT_HEEL] = createLandmark({ y: -leftHeelSignal });
-  landmarks[LANDMARK.RIGHT_HEEL] = createLandmark({ y: -rightHeelSignal });
+  landmarks[LANDMARK.LEFT_HEEL] = createLandmark({ y: leftHeelSignal });
+  landmarks[LANDMARK.RIGHT_HEEL] = createLandmark({ y: rightHeelSignal });
   landmarks[LANDMARK.LEFT_FOOT_INDEX] = createLandmark({ y: -leftToeSignal });
   landmarks[LANDMARK.RIGHT_FOOT_INDEX] = createLandmark({ y: -rightToeSignal });
 

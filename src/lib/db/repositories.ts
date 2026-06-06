@@ -31,7 +31,25 @@ export async function deletePatient(
   patientId: string,
   database: GaitDB = db,
 ): Promise<void> {
-  await database.patients.delete(patientId);
+  await database.transaction(
+    'rw',
+    database.patients,
+    database.assessments,
+    database.poseSequences,
+    database.results,
+    async () => {
+      const assessments = await database.assessments.where({ patientId }).toArray();
+      const assessmentIds = assessments.map((assessment) => assessment.id);
+      const poseAssessmentIds = [...assessmentIds, patientId];
+
+      await Promise.all([
+        database.patients.delete(patientId),
+        database.assessments.where({ patientId }).delete(),
+        database.results.where({ patientId }).delete(),
+        database.poseSequences.where('assessmentId').anyOf(poseAssessmentIds).delete(),
+      ]);
+    },
+  );
 }
 
 /** Create or replace assessment metadata. */

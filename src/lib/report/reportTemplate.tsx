@@ -46,7 +46,9 @@ export function ReportTemplate({
       {children}
 
       <footer className="rounded-md border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-600">
-        本報告為臨床決策輔助，不應作為唯一診斷依據。
+        This report supports clinical decision-making and should not be used as the
+        sole basis for diagnosis, treatment, fall-risk classification, or
+        neurological disease classification.
       </footer>
     </section>
   );

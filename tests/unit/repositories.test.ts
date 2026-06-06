@@ -131,6 +131,41 @@ describe('IndexedDB repositories', () => {
     await expect(getPatient(patient.id, database)).resolves.toBeUndefined();
   });
 
+  it('deletes a patient with linked assessments, results, and pose sequences', async () => {
+    database = createTestDatabase();
+    const patient = createPatientFixture();
+    const assessment = createAssessmentFixture();
+    const result = createResultFixture();
+    const finalPoseRecord = {
+      assessmentId: assessment.id,
+      data: createEmptyPoseSequence(now),
+      id: 'pose-sequence-final',
+    };
+    const draftPoseRecord = {
+      assessmentId: patient.id,
+      data: createEmptyPoseSequence(now),
+      id: `draft:${patient.id}`,
+    };
+
+    await createPatient(patient, database);
+    await createAssessment(assessment, database);
+    await saveResult(result, database);
+    await savePoseSequence(finalPoseRecord, database);
+    await savePoseSequence(draftPoseRecord, database);
+
+    await deletePatient(patient.id, database);
+
+    await expect(getPatient(patient.id, database)).resolves.toBeUndefined();
+    await expect(getAssessment(assessment.id, database)).resolves.toBeUndefined();
+    await expect(getResult(result.assessmentId, database)).resolves.toBeUndefined();
+    await expect(
+      getPoseSequenceByAssessment(assessment.id, database),
+    ).resolves.toBeUndefined();
+    await expect(
+      getPoseSequenceByAssessment(patient.id, database),
+    ).resolves.toBeUndefined();
+  });
+
   it('writes, reads, and deletes assessments', async () => {
     database = createTestDatabase();
     const assessment = createAssessmentFixture();

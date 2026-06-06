@@ -114,13 +114,13 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
           audio: false,
           video: videoConstraints,
         });
+        streamRef.current = stream;
         const video = videoRef.current;
 
         if (video === null) {
           throw new Error('Camera preview element is unavailable.');
         }
 
-        streamRef.current = stream;
         video.srcObject = stream;
         await video.play();
 

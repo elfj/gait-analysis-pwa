@@ -181,4 +181,51 @@ describe('CameraView', () => {
 
     expect(onError).toHaveBeenCalledWith(error);
   });
+
+  it('stops a granted stream if startup completes after unmount', async () => {
+    const ref = createRef<CameraViewHandle>();
+    const onError = vi.fn();
+    const deferredStream = createDeferred<MediaStream>();
+
+    getUserMediaMock.mockReturnValueOnce(deferredStream.promise);
+    render(
+      <CameraView
+        detector={detectorMock.detector}
+        onError={onError}
+        ref={ref}
+      />,
+    );
+
+    const startPromise = ref.current?.start();
+    cleanup();
+    deferredStream.resolve(mediaStream as unknown as MediaStream);
+
+    await expect(startPromise).rejects.toThrow('Camera preview element is unavailable.');
+    expect(mediaTrack.stop).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Camera preview element is unavailable.',
+      }),
+    );
+  });
 });
+
+/** Create a manually resolved promise for async lifecycle tests. */
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  reject: (reason?: unknown) => void;
+  resolve: (value: T) => void;
+} {
+  let resolvePromise: (value: T) => void = () => undefined;
+  let rejectPromise: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+
+  return {
+    promise,
+    reject: rejectPromise,
+    resolve: resolvePromise,
+  };
+}

@@ -7,6 +7,8 @@ import {
   type CameraViewProps,
 } from '@/components/CameraView';
 import { QualityIndicator } from '@/components/QualityIndicator';
+import { createDraftPoseSequenceId } from '@/lib/db/draftPoseSequence';
+import { savePoseSequence } from '@/lib/db/repositories';
 import { computeQualityScore } from '@/lib/pose/qc';
 import { useAssessmentStore } from '@/stores/assessmentStore';
 import type { QualityScore } from '@/types/gait';
@@ -20,11 +22,14 @@ export interface CapturePageProps {
   CameraComponent?: React.ForwardRefExoticComponent<
     CameraViewProps & React.RefAttributes<CameraViewHandle>
   >;
+  /** Optional local pose persistence override for focused tests. */
+  persistPoseSequence?: typeof savePoseSequence;
 }
 
 /** Render the guided camera capture workflow. */
 export function CapturePage({
   CameraComponent = CameraView,
+  persistPoseSequence = savePoseSequence,
 }: CapturePageProps): React.JSX.Element {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -33,6 +38,8 @@ export function CapturePage({
   const [frames, setFrames] = useState<PoseFrame[]>([]);
   const [quality, setQuality] = useState<QualityScore | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const assessmentId = id ?? 'demo';
   const sequencePreview = useMemo(
@@ -42,9 +49,14 @@ export function CapturePage({
 
   /** Start camera capture through the CameraView imperative API. */
   async function handleStart(): Promise<void> {
+    if (isRecording || isStarting) {
+      return;
+    }
+
     setErrorMessage(null);
     setFrames([]);
     setQuality(null);
+    setIsStarting(true);
 
     try {
       await cameraRef.current?.start();
@@ -52,18 +64,42 @@ export function CapturePage({
     } catch (error) {
       setErrorMessage(createCameraErrorMessage(error));
       setIsRecording(false);
+    } finally {
+      setIsStarting(false);
     }
   }
 
   /** Stop capture, persist frames in transient state, and continue to analysis. */
-  function handleStop(): void {
+  async function handleStop(): Promise<void> {
+    if (isSaving) {
+      return;
+    }
+
     const capturedFrames = cameraRef.current?.getFrames() ?? frames;
     cameraRef.current?.stop();
     setIsRecording(false);
 
     const sequence = buildPoseSequence(capturedFrames);
-    setCapturedSequence(sequence);
-    navigate(`/assessment/${assessmentId}/analyzing`);
+
+    if (sequence.frames.length === 0) {
+      setErrorMessage('No pose frames were captured. Keep the full body visible and record again.');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await persistPoseSequence({
+        assessmentId,
+        data: sequence,
+        id: createDraftPoseSequenceId(assessmentId),
+      });
+      setCapturedSequence(sequence);
+      navigate(`/assessment/${assessmentId}/analyzing`);
+    } catch (error) {
+      setErrorMessage(createPosePersistenceErrorMessage(error));
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   /** Update local recording state whenever a pose frame arrives. */
@@ -91,23 +127,25 @@ export function CapturePage({
         <div className="flex flex-wrap gap-3">
           <button
             className="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isRecording}
+            disabled={isRecording || isStarting || isSaving}
             onClick={() => {
               void handleStart();
             }}
             type="button"
           >
             <Play aria-hidden="true" className="h-4 w-4" />
-            Start recording
+            {isStarting ? 'Starting...' : 'Start recording'}
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!isRecording}
-            onClick={handleStop}
+            disabled={!isRecording || isSaving}
+            onClick={() => {
+              void handleStop();
+            }}
             type="button"
           >
             <CircleStop aria-hidden="true" className="h-4 w-4" />
-            Stop recording
+            {isSaving ? 'Saving...' : 'Stop recording'}
           </button>
         </div>
       </div>
@@ -218,6 +256,18 @@ function createCameraErrorMessage(error: unknown): string {
   }
 
   return 'Unable to start camera capture. Check camera permission and device availability, then try again.';
+}
+
+/** Convert local pose persistence failures into actionable user messages. */
+function createPosePersistenceErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('quota') || normalized.includes('storage')) {
+    return 'Captured keypoints could not be saved because browser storage is unavailable or full. Free device storage, then try again.';
+  }
+
+  return 'Captured keypoints could not be saved locally. Retry stopping the recording before leaving this page.';
 }
 
 /** Builds a pose sequence from captured frames. */

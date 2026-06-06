@@ -55,7 +55,20 @@ describe('analyzeGait', () => {
     };
 
     await expect(analyzeGait(shortSequence, patient)).rejects.toThrow(
-      'At least two heel-strike events are required for gait analysis.',
+      'At least four heel-strike events are required for gait analysis.',
+    );
+  });
+
+  it('throws when heel strikes lack toe-offs required for stance metrics', async () => {
+    const sequence = createPipelineSequence();
+
+    for (const frame of sequence.frames) {
+      setLandmarkY(frame.landmarks, LANDMARK.LEFT_FOOT_INDEX, 0.68);
+      setLandmarkY(frame.landmarks, LANDMARK.RIGHT_FOOT_INDEX, 0.68);
+    }
+
+    await expect(analyzeGait(sequence, patient)).rejects.toThrow(
+      'toe-off event within a stride is required',
     );
   });
 });
@@ -155,13 +168,13 @@ function setStepTrajectory(worldLandmarks: Landmark3D[], phase: number): void {
 
   worldLandmarks[LANDMARK.LEFT_ANKLE] = {
     ...leftAnkle,
-    x: 0.06,
-    z: halfStepLength,
+    x: halfStepLength,
+    z: 0.06,
   };
   worldLandmarks[LANDMARK.RIGHT_ANKLE] = {
     ...rightAnkle,
-    x: -0.06,
-    z: -halfStepLength,
+    x: -halfStepLength,
+    z: -0.06,
   };
 }
 
@@ -174,8 +187,8 @@ function setCaptureSignals(
   const isLeftContact = frameIndex % FPS === 0;
   const isRightContact = frameIndex % FPS === FPS / 2;
 
-  setLandmarkY(landmarks, LANDMARK.LEFT_HEEL, isLeftContact ? 0.45 : 0.6);
-  setLandmarkY(landmarks, LANDMARK.RIGHT_HEEL, isRightContact ? 0.45 : 0.6);
+  setLandmarkY(landmarks, LANDMARK.LEFT_HEEL, isLeftContact ? 0.75 : 0.6);
+  setLandmarkY(landmarks, LANDMARK.RIGHT_HEEL, isRightContact ? 0.75 : 0.6);
   setLandmarkY(landmarks, LANDMARK.LEFT_ANKLE, isLeftContact ? 0.75 : 0.65);
   setLandmarkY(landmarks, LANDMARK.RIGHT_ANKLE, isRightContact ? 0.75 : 0.65);
   setLandmarkY(landmarks, LANDMARK.LEFT_FOOT_INDEX, 0.68 + 0.03 * Math.sin(phase));
