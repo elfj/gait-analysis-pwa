@@ -11,6 +11,7 @@ import {
   getAssessment,
   getPatient,
   getPoseSequenceByAssessment,
+  getResult,
   listPatients,
   listResultsByPatient,
   savePoseSequence,
@@ -178,6 +179,9 @@ describe('IndexedDB repositories', () => {
       result.assessmentId,
     );
 
+    await expect(getResult(result.assessmentId, database)).resolves.toEqual(
+      result,
+    );
     await expect(
       listResultsByPatient(result.patientId, database),
     ).resolves.toEqual([result]);

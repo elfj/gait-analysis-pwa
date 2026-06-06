@@ -93,6 +93,14 @@ export async function saveResult(
   return result.assessmentId;
 }
 
+/** Fetch one analysis result by assessment identifier. */
+export async function getResult(
+  assessmentId: string,
+  database: GaitDB = db,
+): Promise<GaitAnalysisResult | undefined> {
+  return database.results.get(assessmentId);
+}
+
 /** List analysis results for one patient ordered by performed date. */
 export async function listResultsByPatient(
   patientId: string,
