@@ -1,8 +1,7 @@
-import {
-  FilesetResolver,
+import type {
+  Landmark,
+  NormalizedLandmark,
   PoseLandmarker,
-  type Landmark,
-  type NormalizedLandmark,
 } from '@mediapipe/tasks-vision';
 import type { Landmark3D, PoseFrame } from '@/types/pose';
 
@@ -48,6 +47,8 @@ export class PoseDetector {
 
   /** Initialize MediaPipe PoseLandmarker, falling back to CPU if GPU fails. */
   async initialize(options: PoseDetectorOptions = {}): Promise<void> {
+    const { FilesetResolver, PoseLandmarker } =
+      await import('@mediapipe/tasks-vision');
     const wasmBaseUrl = options.wasmBaseUrl ?? DEFAULT_WASM_BASE_URL;
     const modelAssetPath = options.modelAssetPath ?? DEFAULT_MODEL_ASSET_PATH;
     const preferredDelegate = options.preferredDelegate ?? 'GPU';

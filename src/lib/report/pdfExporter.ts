@@ -1,6 +1,14 @@
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import type { GaitAnalysisResult } from '@/types/gait';
+
+/** DOM capture function shape used by the PDF exporter. */
+export type CaptureElement = (
+  element: HTMLElement,
+  options: {
+    backgroundColor: string;
+    scale: number;
+    useCORS: boolean;
+  },
+) => Promise<HTMLCanvasElement>;
 
 /** Options for exporting a result report to PDF. */
 export interface ExportPdfReportOptions {
@@ -15,9 +23,9 @@ export interface ExportPdfReportOptions {
 /** Dependencies for PDF export, exposed for deterministic unit tests. */
 export interface PdfExportDependencies {
   /** Capture a DOM element as a canvas. */
-  captureElement: typeof html2canvas;
+  captureElement: CaptureElement;
   /** Create a new jsPDF document. */
-  createPdf: () => PdfDocument;
+  createPdf: () => Promise<PdfDocument>;
 }
 
 /** Minimal jsPDF surface used by the exporter. */
@@ -43,9 +51,14 @@ export interface PdfDocument {
 }
 
 const defaultDependencies: PdfExportDependencies = {
-  captureElement: html2canvas,
-  createPdf: () =>
-    new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm' }),
+  captureElement: async (element, options) => {
+    const { default: html2canvas } = await import('html2canvas');
+    return html2canvas(element, options);
+  },
+  createPdf: async () => {
+    const { jsPDF } = await import('jspdf');
+    return new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm' });
+  },
 };
 
 /** Export the provided report element as a single-page A4 PDF. */
@@ -58,7 +71,7 @@ export async function exportPdfReport(
     scale: 2,
     useCORS: true,
   });
-  const pdf = dependencies.createPdf();
+  const pdf = await dependencies.createPdf();
   const imageData = canvas.toDataURL('image/png');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();

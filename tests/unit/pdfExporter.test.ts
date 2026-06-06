@@ -21,7 +21,7 @@ describe('pdfExporter', () => {
       { element, result },
       {
         captureElement,
-        createPdf: () => pdf,
+        createPdf: () => Promise.resolve(pdf),
       },
     );
 

@@ -11,8 +11,9 @@ import { HomePage } from '../../src/pages/HomePage';
 import { NewAssessmentPage } from '../../src/pages/NewAssessmentPage';
 import { NewPatientPage } from '../../src/pages/NewPatientPage';
 import { ResultPage } from '../../src/pages/ResultPage';
+import { appRoutes } from '../../src/routes';
 
-const routes = [
+const testRoutes = [
   {
     path: '/',
     element: <App />,
@@ -28,6 +29,15 @@ const routes = [
 ];
 
 describe('application routes', () => {
+  it('defines lazy route chunks for production routing', () => {
+    const childRoutes = appRoutes[0]?.children ?? [];
+
+    expect(childRoutes).toHaveLength(6);
+    expect(childRoutes.every((route) => typeof route.lazy === 'function')).toBe(
+      true,
+    );
+  });
+
   it.each([
     ['/', 'Gait Analysis MVP'],
     ['/patient/new', 'New Patient'],
@@ -35,16 +45,18 @@ describe('application routes', () => {
     ['/assessment/assessment-1/capture', 'Guided Camera Capture'],
     ['/assessment/assessment-1/analyzing', 'Analyzing Assessment'],
     ['/assessment/assessment-1/result', 'Assessment Result'],
-  ])('renders %s', (path, heading) => {
+  ])('renders %s', async (path, heading) => {
     renderRoute(path);
 
-    expect(screen.getAllByRole('heading', { name: heading }).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByRole('heading', { name: heading })).length,
+    ).toBeGreaterThan(0);
   });
 });
 
 /** Render one app route with an in-memory router. */
 function renderRoute(path: string): void {
-  const router = createMemoryRouter(routes, {
+  const router = createMemoryRouter(testRoutes, {
     initialEntries: [path],
   });
 
