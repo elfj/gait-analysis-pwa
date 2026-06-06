@@ -21,6 +21,7 @@ The MVP stores derived gait data locally in IndexedDB. Raw camera video is not p
 - Primary key: `id`
 - Indexes: `assessmentId`
 - Stores MediaPipe pose keypoint sequences. Draft captures use `assessmentId = patientId` and `id = draft:<patientId>` so analysis can recover after reload or tab discard. Final records use the generated assessment result ID.
+- Draft captures intentionally remain after analysis failure so clinicians can retry analysis without recapturing. They are deleted after successful result persistence or when the linked patient is deleted.
 
 `results`
 
@@ -31,6 +32,8 @@ The MVP stores derived gait data locally in IndexedDB. Raw camera video is not p
 ## Deletion Semantics
 
 Deleting a patient cascades across linked assessment metadata, gait results, final pose sequences, and the patient's draft pose sequence. This avoids retaining derived health data after the visible patient record is removed.
+
+The cascade includes the bare `patientId` in the pose-sequence lookup because draft records are indexed by patient ID before a final assessment ID exists.
 
 ## Privacy Notes
 

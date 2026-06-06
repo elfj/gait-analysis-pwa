@@ -40,6 +40,7 @@ export async function deletePatient(
     async () => {
       const assessments = await database.assessments.where({ patientId }).toArray();
       const assessmentIds = assessments.map((assessment) => assessment.id);
+      // Draft captures are indexed by patientId until analysis creates a final assessment.
       const poseAssessmentIds = [...assessmentIds, patientId];
 
       await Promise.all([

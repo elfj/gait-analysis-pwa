@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { forwardRef, useImperativeHandle } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -76,7 +76,7 @@ describe('CapturePage', () => {
 
   it('shows an actionable message when camera permission is denied', async () => {
     fakeStart.mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'));
-    fakePersistPoseSequence.mockResolvedValue('draft:assessment-1');
+    fakePersistPoseSequence.mockResolvedValue('draft:patient-1');
 
     renderCapturePage();
 
@@ -93,7 +93,7 @@ describe('CapturePage', () => {
 
   it('stops capture, stores sequence, and navigates to analyzing', async () => {
     fakeStart.mockResolvedValueOnce();
-    fakePersistPoseSequence.mockResolvedValue('draft:assessment-1');
+    fakePersistPoseSequence.mockResolvedValue('draft:patient-1');
 
     renderCapturePage();
 
@@ -113,7 +113,41 @@ describe('CapturePage', () => {
     expect(fakePersistPoseSequence.mock.calls[0]?.[0].data.frames).toEqual([poseFrame]);
     expect(useAssessmentStore.getState().capturedSequence?.frames).toEqual([poseFrame]);
   });
+
+  it('ignores a second start click while startup is in flight', async () => {
+    const deferredStart = createDeferred<undefined>();
+
+    fakeStart.mockReturnValue(deferredStart.promise);
+    fakePersistPoseSequence.mockResolvedValue('draft:patient-1');
+
+    renderCapturePage();
+
+    const startButton = screen.getByRole('button', { name: 'Start recording' });
+    fireEvent.click(startButton);
+    fireEvent.click(startButton);
+
+    expect(fakeStart).toHaveBeenCalledTimes(1);
+
+    deferredStart.resolve(undefined);
+    await screen.findByText('1');
+  });
 });
+
+/** Create a manually resolved promise for startup race tests. */
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolvePromise: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  return {
+    promise,
+    resolve: resolvePromise,
+  };
+}
 
 /** Render CapturePage with route params and fake analyzing route. */
 function renderCapturePage(): void {

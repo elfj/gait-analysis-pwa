@@ -48,8 +48,8 @@ export function HomePage({
   }, [repository]);
 
   /** Delete a patient and refresh the visible list. */
-  async function handleDelete(patientId: string): Promise<void> {
-    if (!confirmPatientDeletion(patientId)) {
+  async function handleDelete(patientId: string, displayLabel: string): Promise<void> {
+    if (!confirmPatientDeletion(displayLabel)) {
       return;
     }
 
@@ -173,7 +173,7 @@ export function HomePage({
                         aria-label={`Delete ${patient.externalId ?? patient.id}`}
                         className="inline-flex items-center justify-center rounded-md border border-red-200 bg-white p-2 text-red-700 hover:bg-red-50"
                         onClick={() => {
-                          void handleDelete(patient.id);
+                          void handleDelete(patient.id, patient.externalId ?? patient.id);
                         }}
                         type="button"
                       >
@@ -269,9 +269,9 @@ function removeHistory(
 }
 
 /** Confirm destructive patient deletion with the browser-native dialog. */
-function confirmPatientDeletion(patientId: string): boolean {
+function confirmPatientDeletion(displayLabel: string): boolean {
   return window.confirm(
-    `Delete patient ${patientId} and all linked assessments, pose keypoints, and results?`,
+    `Delete patient ${displayLabel} and all linked assessments, pose keypoints, and results?`,
   );
 }
 

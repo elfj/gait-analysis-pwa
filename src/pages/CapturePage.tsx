@@ -35,6 +35,7 @@ export function CapturePage({
   const navigate = useNavigate();
   const setCapturedSequence = useAssessmentStore((state) => state.setCapturedSequence);
   const cameraRef = useRef<CameraViewHandle | null>(null);
+  const isStartingRef = useRef(false);
   const [frames, setFrames] = useState<PoseFrame[]>([]);
   const [quality, setQuality] = useState<QualityScore | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -49,10 +50,11 @@ export function CapturePage({
 
   /** Start camera capture through the CameraView imperative API. */
   async function handleStart(): Promise<void> {
-    if (isRecording || isStarting) {
+    if (isRecording || isStartingRef.current) {
       return;
     }
 
+    isStartingRef.current = true;
     setErrorMessage(null);
     setFrames([]);
     setQuality(null);
@@ -65,6 +67,7 @@ export function CapturePage({
       setErrorMessage(createCameraErrorMessage(error));
       setIsRecording(false);
     } finally {
+      isStartingRef.current = false;
       setIsStarting(false);
     }
   }

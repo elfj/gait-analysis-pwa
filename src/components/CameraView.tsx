@@ -56,7 +56,9 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
     const detectorRef = useRef<PoseDetector>(detector ?? new PoseDetector());
     const frameRequestRef = useRef<number | null>(null);
     const framesRef = useRef<PoseFrame[]>([]);
+    const isMountedRef = useRef(true);
     const recordingStartMsRef = useRef<number | null>(null);
+    const startTokenRef = useRef(0);
     const streamRef = useRef<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [isRunning, setIsRunning] = useState(false);
@@ -67,6 +69,8 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
     });
 
     const stop = useCallback((): void => {
+      startTokenRef.current += 1;
+
       if (frameRequestRef.current !== null) {
         cancelAnimationFrame(frameRequestRef.current);
         frameRequestRef.current = null;
@@ -80,6 +84,12 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
       recordingStartMsRef.current = null;
       detectorRef.current.dispose();
       setIsRunning(false);
+    }, []);
+
+    const assertStartStillActive = useCallback((startToken: number): void => {
+      if (!isMountedRef.current || startToken !== startTokenRef.current) {
+        throw new Error('Camera startup was cancelled.');
+      }
     }, []);
 
     const detectLoop = useCallback((): void => {
@@ -107,6 +117,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
     const start = useCallback(async (): Promise<void> => {
       try {
         stop();
+        const startToken = startTokenRef.current;
         framesRef.current = [];
         setLatestFrame(null);
 
@@ -115,6 +126,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
           video: videoConstraints,
         });
         streamRef.current = stream;
+        assertStartStillActive(startToken);
         const video = videoRef.current;
 
         if (video === null) {
@@ -123,6 +135,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
 
         video.srcObject = stream;
         await video.play();
+        assertStartStillActive(startToken);
 
         setOverlaySize({
           height: video.videoHeight || 720,
@@ -130,6 +143,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
         });
 
         await detectorRef.current.initialize();
+        assertStartStillActive(startToken);
 
         recordingStartMsRef.current = performance.now();
         setIsRunning(true);
@@ -141,7 +155,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
         onError?.(normalizedError);
         throw normalizedError;
       }
-    }, [detectLoop, onError, stop, videoConstraints]);
+    }, [assertStartStillActive, detectLoop, onError, stop, videoConstraints]);
 
     useImperativeHandle(
       ref,
@@ -154,7 +168,10 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
     );
 
     useEffect(() => {
+      isMountedRef.current = true;
+
       return () => {
+        isMountedRef.current = false;
         stop();
       };
     }, [stop]);

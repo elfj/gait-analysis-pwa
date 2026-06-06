@@ -22,7 +22,7 @@ export function ReportTemplate({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase text-slate-500">
-              Hospital logo placeholder
+              Clinical gait assessment
             </p>
             <h3 className="mt-2 text-xl font-bold text-slate-950">
               10MWT Gait Analysis Report

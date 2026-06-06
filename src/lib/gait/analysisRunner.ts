@@ -18,9 +18,16 @@ export function analyzeGaitInWorker(
   patient: Patient,
 ): Promise<GaitAnalysisResult> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./analysisWorker.ts', import.meta.url), {
-      type: 'module',
-    });
+    let worker: Worker;
+
+    try {
+      worker = new Worker(new URL('./analysisWorker.ts', import.meta.url), {
+        type: 'module',
+      });
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
 
     worker.addEventListener('message', (event: MessageEvent<AnalysisWorkerResponse>) => {
       worker.terminate();

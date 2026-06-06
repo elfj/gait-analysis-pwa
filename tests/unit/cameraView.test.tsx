@@ -200,13 +200,30 @@ describe('CameraView', () => {
     cleanup();
     deferredStream.resolve(mediaStream as unknown as MediaStream);
 
-    await expect(startPromise).rejects.toThrow('Camera preview element is unavailable.');
+    await expect(startPromise).rejects.toThrow('Camera startup was cancelled.');
     expect(mediaTrack.stop).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: 'Camera preview element is unavailable.',
+        message: 'Camera startup was cancelled.',
       }),
     );
+  });
+
+  it('disposes a detector initialized after unmount', async () => {
+    const ref = createRef<CameraViewHandle>();
+    const deferredInitialize = createDeferred<undefined>();
+
+    detectorMock.initializeMock.mockReturnValueOnce(deferredInitialize.promise);
+    render(<CameraView detector={detectorMock.detector} ref={ref} />);
+
+    const startPromise = ref.current?.start();
+    await Promise.resolve();
+    cleanup();
+    deferredInitialize.resolve(undefined);
+
+    await expect(startPromise).rejects.toThrow('Camera startup was cancelled.');
+    expect(detectorMock.disposeMock).toHaveBeenCalled();
+    expect(mediaTrack.stop).toHaveBeenCalled();
   });
 });
 

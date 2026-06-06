@@ -64,7 +64,7 @@ describe('HomePage', () => {
 
   it('deletes a patient and refreshes the list', async () => {
     const repository = createRepository();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderHomePage(repository);
 
@@ -74,6 +74,9 @@ describe('HomePage', () => {
       expect(screen.queryByText('MRN-001')).toBeNull();
     });
     expect(repository.deletePatient).toHaveBeenCalledWith('patient-1');
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Delete patient MRN-001 and all linked assessments, pose keypoints, and results?',
+    );
   });
 
   it('keeps a patient when delete confirmation is cancelled', async () => {
