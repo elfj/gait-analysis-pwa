@@ -1,0 +1,25 @@
+{
+  "name": "Gait Analysis MVP",
+  "short_name": "Gait MVP",
+  "description": "Privacy-first home gait analysis for 10-meter walk tests.",
+  "theme_color": "#0f766e",
+  "background_color": "#f8fafc",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

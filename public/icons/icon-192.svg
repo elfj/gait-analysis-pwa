@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="Gait Analysis MVP icon">
+  <rect width="192" height="192" rx="36" fill="#0f766e"/>
+  <path d="M96 40c-17.7 0-32 14.3-32 32 0 11.9 6.5 22.3 16.2 27.8L68 152h20l8-34 8 34h20l-12.2-52.2C121.5 94.3 128 83.9 128 72c0-17.7-14.3-32-32-32Z" fill="#ffffff"/>
+  <circle cx="96" cy="72" r="14" fill="#0f766e"/>
+</svg>
