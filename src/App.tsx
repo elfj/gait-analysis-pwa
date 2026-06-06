@@ -4,7 +4,6 @@ import { NavLink, Outlet } from 'react-router-dom';
 const navItems = [
   { label: 'Patients', to: '/', icon: Home },
   { label: 'New Patient', to: '/patient/new', icon: FilePlus2 },
-  { label: 'Demo Capture', to: '/assessment/demo/capture', icon: Activity },
 ] as const;
 
 /** Render the application shell and nested route outlet. */

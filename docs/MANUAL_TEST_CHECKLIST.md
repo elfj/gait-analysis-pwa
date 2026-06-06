@@ -1,6 +1,6 @@
 # Manual E2E Test Checklist
 
-This checklist verifies the MVP flow from patient creation to capture, analysis, result review, and PDF export. Run it on at least one desktop browser for baseline behavior, then repeat the camera-specific items on iPhone Safari and Android Chrome.
+This checklist verifies the MVP flow from patient creation to capture, analysis, result review, PDF export, offline/PWA behavior, and error recovery. Run it on at least one desktop browser for baseline behavior, then repeat the camera-specific items on iPhone Safari and Android Chrome.
 
 ## Test Environment
 
@@ -93,8 +93,40 @@ This checklist verifies the MVP flow from patient creation to capture, analysis,
     - Expected: The PDF opens as an A4 report with header, de-identified patient ID, date, summary metrics, charts, table, warnings, and disclaimer.
     - Evidence:
 
+21. [ ] Reload the installed PWA with the network disabled after a successful production load.
+    - Expected: The service worker serves the app shell and no blank screen appears.
+    - Evidence:
+
+22. [ ] Re-enable the network and reload after a new production build is deployed.
+    - Expected: The app updates without losing the ability to open the patient list.
+    - Evidence:
+
+23. [ ] Deny camera permission, then re-grant permission from browser settings and tap the retry action.
+    - Expected: Camera capture starts without requiring a full app reinstall.
+    - Evidence:
+
+24. [ ] Start recording, then interrupt the session by backgrounding the browser or locking the screen.
+    - Expected: The app does not crash and either resumes safely or allows a new capture attempt.
+    - Evidence:
+
+25. [ ] Trigger a low-quality recording by keeping lower-limb landmarks partially out of frame.
+    - Expected: Analysis shows a quality failure report with concrete recapture guidance.
+    - Evidence:
+
+26. [ ] Retry analysis from the failure state after returning to the capture page.
+    - Expected: The previous failure state clears and a new capture can be analyzed.
+    - Evidence:
+
+27. [ ] Navigate the patient list, new patient form, and result page with keyboard focus only.
+    - Expected: Interactive controls are reachable, visibly focused, and usable.
+    - Evidence:
+
+28. [ ] Inspect the PWA manifest and icons from the production URL.
+    - Expected: PNG 192x192 and 512x512 icons are served successfully and referenced by the manifest.
+    - Evidence:
+
 ## Pass Criteria
 
-- All 20 checklist items pass on the baseline desktop browser.
+- All checklist items pass on the baseline desktop browser.
 - Camera-specific items pass on both iPhone Safari and Android Chrome.
 - Any failed item has a linked issue or follow-up task before release.
