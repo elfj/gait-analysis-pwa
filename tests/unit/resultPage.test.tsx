@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ResultPage, type ResultPageRepository } from '../../src/pages/ResultPage';
+import {
+  ResultPage,
+  type ResultPageRepository,
+  type ResultPdfExporter,
+} from '../../src/pages/ResultPage';
 import type { GaitAnalysisResult } from '../../src/types/gait';
 
 describe('ResultPage', () => {
@@ -22,7 +27,13 @@ describe('ResultPage', () => {
   it('renders summary cards, charts, table, and confidence notes', async () => {
     renderResultPage(createRepository(createResultFixture()));
 
-    expect(await screen.findByRole('heading', { name: 'Assessment Result' })).toBeDefined();
+    expect(
+      await screen.findByRole('heading', { name: 'Assessment Result' }),
+    ).toBeDefined();
+    expect(screen.getByText('10MWT Gait Analysis Report')).toBeDefined();
+    expect(
+      screen.getByText('本報告為臨床決策輔助，不應作為唯一診斷依據。'),
+    ).toBeDefined();
     expect(screen.getByText('1.23')).toBeDefined();
     expect(screen.getByText('112')).toBeDefined();
     expect(screen.getByText('Spatiotemporal parameters')).toBeDefined();
@@ -36,6 +47,19 @@ describe('ResultPage', () => {
     renderResultPage(createRepository(undefined));
 
     expect(await screen.findByText('Result was not found.')).toBeDefined();
+  });
+
+  it('exports the report when the PDF button is clicked', async () => {
+    const result = createResultFixture();
+    const pdfExporter: ResultPdfExporter = vi.fn(() => Promise.resolve());
+
+    renderResultPage(createRepository(result), pdfExporter);
+
+    await screen.findByRole('heading', { name: 'Assessment Result' });
+    await userEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+
+    expect(pdfExporter).toHaveBeenCalledTimes(1);
+    expect(pdfExporter).toHaveBeenCalledWith(expect.any(HTMLElement), result);
   });
 });
 
@@ -58,21 +82,29 @@ class ResizeObserverMock {
 }
 
 /** Render ResultPage with route params. */
-function renderResultPage(repository: ResultPageRepository): void {
+function renderResultPage(
+  repository: ResultPageRepository,
+  pdfExporter?: ResultPdfExporter,
+): void {
+  const page = pdfExporter ? (
+    <ResultPage pdfExporter={pdfExporter} repository={repository} />
+  ) : (
+    <ResultPage repository={repository} />
+  );
+
   render(
     <MemoryRouter initialEntries={['/assessment/assessment-1/result']}>
       <Routes>
-        <Route
-          path="/assessment/:id/result"
-          element={<ResultPage repository={repository} />}
-        />
+        <Route path="/assessment/:id/result" element={page} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
 /** Create a repository test double for result page tests. */
-function createRepository(result: GaitAnalysisResult | undefined): ResultPageRepository {
+function createRepository(
+  result: GaitAnalysisResult | undefined,
+): ResultPageRepository {
   return {
     getResult: vi.fn(() => Promise.resolve(result)),
   };
@@ -131,5 +163,8 @@ function createResultFixture(): GaitAnalysisResult {
 
 /** Create a 101-point chart curve. */
 function createCurve(value: number): number[] {
-  return Array.from({ length: 101 }, (_, index) => value + Math.sin(index / 10));
+  return Array.from(
+    { length: 101 },
+    (_, index) => value + Math.sin(index / 10),
+  );
 }
