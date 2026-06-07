@@ -142,7 +142,35 @@ describe('CameraView', () => {
     expect(detectorMock.detectMock.mock.calls).toHaveLength(1);
     expect(onPoseFrame).toHaveBeenCalledWith(poseFrame);
     expect(ref.current?.getFrames()).toEqual([poseFrame]);
-    expect(screen.getByRole('status').textContent).toBe('Camera running');
+    expect(screen.getByRole('status').textContent).toBe(
+      'Camera preview running',
+    );
+  });
+
+  it('previews pose frames without storing them as recording frames', async () => {
+    const ref = createRef<CameraViewHandle>();
+
+    render(
+      <CameraView
+        detector={detectorMock.detector}
+        onPoseFrame={onPoseFrame}
+        ref={ref}
+      />,
+    );
+
+    await act(async () => {
+      await ref.current?.startPreview();
+    });
+    act(() => {
+      animationCallback?.(1016);
+    });
+
+    expect(detectorMock.detectMock.mock.calls).toHaveLength(1);
+    expect(onPoseFrame).not.toHaveBeenCalled();
+    expect(ref.current?.getFrames()).toEqual([]);
+    expect(screen.getByRole('status').textContent).toBe(
+      'Camera preview running',
+    );
   });
 
   it('stops camera tracks and disposes detector', async () => {

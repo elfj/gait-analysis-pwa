@@ -1,5 +1,12 @@
-import { AlertTriangle, Camera, CircleStop, Play, RotateCcw, Ruler } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  Camera,
+  CircleStop,
+  Play,
+  RotateCcw,
+  Ruler,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   CameraView,
@@ -33,22 +40,62 @@ export function CapturePage({
 }: CapturePageProps): React.JSX.Element {
   const { patientId: patientIdParam } = useParams();
   const navigate = useNavigate();
-  const setCapturedSequence = useAssessmentStore((state) => state.setCapturedSequence);
+  const setCapturedSequence = useAssessmentStore(
+    (state) => state.setCapturedSequence,
+  );
   const cameraRef = useRef<CameraViewHandle | null>(null);
   const isStartingRef = useRef(false);
+  const previewStartTokenRef = useRef(0);
   const [frames, setFrames] = useState<PoseFrame[]>([]);
   const [quality, setQuality] = useState<QualityScore | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isPreviewStarting, setIsPreviewStarting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const patientId = patientIdParam ?? 'demo';
-  const sequencePreview = useMemo(
-    () => buildPoseSequence(frames),
-    [frames],
-  );
+  const sequencePreview = useMemo(() => buildPoseSequence(frames), [frames]);
 
-  /** Start camera capture through the CameraView imperative API. */
+  /** Start camera preview without adding frames to the current recording. */
+  async function handleStartPreview(): Promise<void> {
+    const previewStartToken = previewStartTokenRef.current + 1;
+    previewStartTokenRef.current = previewStartToken;
+
+    setErrorMessage(null);
+    setIsPreviewStarting(true);
+
+    try {
+      await cameraRef.current?.startPreview();
+
+      if (previewStartToken === previewStartTokenRef.current) {
+        setIsPreviewing(true);
+      }
+    } catch (error) {
+      if (previewStartToken === previewStartTokenRef.current) {
+        setErrorMessage(createCameraErrorMessage(error));
+        setIsPreviewing(false);
+      }
+    } finally {
+      if (previewStartToken === previewStartTokenRef.current) {
+        setIsPreviewStarting(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    const camera = cameraRef.current;
+    void Promise.resolve().then(() => {
+      void handleStartPreview();
+    });
+
+    return () => {
+      previewStartTokenRef.current += 1;
+      camera?.stop();
+    };
+  }, []);
+
+  /** Start pose frame recording while keeping the already-running preview visible. */
   async function handleStart(): Promise<void> {
     if (isRecording || isStartingRef.current) {
       return;
@@ -61,7 +108,8 @@ export function CapturePage({
     setIsStarting(true);
 
     try {
-      await cameraRef.current?.start();
+      await cameraRef.current?.startRecording();
+      setIsPreviewing(true);
       setIsRecording(true);
     } catch (error) {
       setErrorMessage(createCameraErrorMessage(error));
@@ -79,13 +127,15 @@ export function CapturePage({
     }
 
     const capturedFrames = cameraRef.current?.getFrames() ?? frames;
-    cameraRef.current?.stop();
+    cameraRef.current?.stopRecording();
     setIsRecording(false);
 
     const sequence = buildPoseSequence(capturedFrames);
 
     if (sequence.frames.length === 0) {
-      setErrorMessage('No pose frames were captured. Keep the full body visible and record again.');
+      setErrorMessage(
+        'No pose frames were captured. Keep the full body visible and record again.',
+      );
       return;
     }
 
@@ -120,7 +170,9 @@ export function CapturePage({
       <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end">
         <div>
           <p className="text-sm font-medium text-teal-700">Capture</p>
-          <h2 className="mt-2 text-3xl font-bold text-slate-950">Guided Camera Capture</h2>
+          <h2 className="mt-2 text-3xl font-bold text-slate-950">
+            Guided Camera Capture
+          </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Assessment ID:{' '}
             <span className="font-medium text-slate-950">{patientId}</span>
@@ -130,7 +182,9 @@ export function CapturePage({
         <div className="flex flex-wrap gap-3">
           <button
             className="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isRecording || isStarting || isSaving}
+            disabled={
+              isRecording || isStarting || isSaving || isPreviewStarting
+            }
             onClick={() => {
               void handleStart();
             }}
@@ -186,7 +240,7 @@ export function CapturePage({
               <button
                 className="mt-3 inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
                 onClick={() => {
-                  void handleStart();
+                  void handleStartPreview();
                 }}
                 type="button"
               >
@@ -194,6 +248,18 @@ export function CapturePage({
                 Try again
               </button>
             </div>
+          ) : null}
+
+          {!errorMessage ? (
+            <p className="text-sm text-slate-600">
+              {isRecording
+                ? 'Recording keypoints now. Keep the full body in frame.'
+                : isPreviewing
+                  ? 'Camera preview is active. Align the subject, then start recording.'
+                  : isPreviewStarting
+                    ? 'Starting camera preview...'
+                    : 'Camera preview is not active.'}
+            </p>
           ) : null}
         </div>
 
@@ -207,7 +273,9 @@ export function CapturePage({
             <dl className="mt-3 space-y-2">
               <div className="flex justify-between gap-3">
                 <dt>Frames</dt>
-                <dd className="font-medium text-slate-950">{String(frames.length)}</dd>
+                <dd className="font-medium text-slate-950">
+                  {String(frames.length)}
+                </dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt>Duration</dt>
@@ -217,7 +285,10 @@ export function CapturePage({
               </div>
             </dl>
           </div>
-          <Link className="text-sm font-medium text-teal-700 hover:text-teal-800" to="/">
+          <Link
+            className="text-sm font-medium text-teal-700 hover:text-teal-800"
+            to="/"
+          >
             Back to patients
           </Link>
         </div>

@@ -19,9 +19,15 @@ const DEFAULT_VIDEO_CONSTRAINTS: MediaTrackConstraints = {
 
 /** Imperative API exposed by CameraView. */
 export interface CameraViewHandle {
-  /** Start camera capture and pose detection. */
+  /** Start camera preview and pose detection without recording frames. */
+  startPreview: () => Promise<void>;
+  /** Start recording pose frames, starting preview first if needed. */
+  startRecording: () => Promise<void>;
+  /** Backward-compatible alias for starting frame recording. */
   start: () => Promise<void>;
-  /** Stop camera capture and pose detection. */
+  /** Stop recording pose frames while keeping camera preview active. */
+  stopRecording: () => void;
+  /** Stop camera preview, pose detection, and frame recording. */
   stop: () => void;
   /** Return captured pose frames in recording order. */
   getFrames: () => PoseFrame[];
@@ -57,6 +63,9 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
     const frameRequestRef = useRef<number | null>(null);
     const framesRef = useRef<PoseFrame[]>([]);
     const isMountedRef = useRef(true);
+    const isPreviewingRef = useRef(false);
+    const isRecordingRef = useRef(false);
+    const previewStartMsRef = useRef<number | null>(null);
     const recordingStartMsRef = useRef<number | null>(null);
     const startTokenRef = useRef(0);
     const streamRef = useRef<MediaStream | null>(null);
@@ -81,6 +90,9 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
       }
 
       streamRef.current = null;
+      isPreviewingRef.current = false;
+      isRecordingRef.current = false;
+      previewStartMsRef.current = null;
       recordingStartMsRef.current = null;
       detectorRef.current.dispose();
       setIsRunning(false);
@@ -94,31 +106,42 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
 
     const detectLoop = useCallback((): void => {
       const video = videoRef.current;
-      const recordingStartMs = recordingStartMsRef.current;
+      const previewStartMs = previewStartMsRef.current;
 
-      if (video === null || recordingStartMs === null) {
+      if (video === null || previewStartMs === null) {
         return;
       }
 
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        const timestampMs = performance.now() - recordingStartMs;
+        const nowMs = performance.now();
+        const recordingStartMs = recordingStartMsRef.current;
+        const timestampMs =
+          recordingStartMs === null
+            ? nowMs - previewStartMs
+            : nowMs - recordingStartMs;
         const frame = detectorRef.current.detect(video, timestampMs);
 
         if (frame !== null) {
-          framesRef.current.push(frame);
           setLatestFrame(frame);
-          onPoseFrame?.(frame);
+
+          if (isRecordingRef.current) {
+            framesRef.current.push(frame);
+            onPoseFrame?.(frame);
+          }
         }
       }
 
       frameRequestRef.current = requestAnimationFrame(detectLoop);
     }, [onPoseFrame]);
 
-    const start = useCallback(async (): Promise<void> => {
+    const startPreview = useCallback(async (): Promise<void> => {
+      if (isPreviewingRef.current) {
+        return;
+      }
+
       try {
         stop();
         const startToken = startTokenRef.current;
-        framesRef.current = [];
         setLatestFrame(null);
 
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -145,7 +168,8 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
         await detectorRef.current.initialize();
         assertStartStillActive(startToken);
 
-        recordingStartMsRef.current = performance.now();
+        previewStartMsRef.current = performance.now();
+        isPreviewingRef.current = true;
         setIsRunning(true);
         frameRequestRef.current = requestAnimationFrame(detectLoop);
       } catch (error) {
@@ -157,14 +181,29 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
       }
     }, [assertStartStillActive, detectLoop, onError, stop, videoConstraints]);
 
+    const startRecording = useCallback(async (): Promise<void> => {
+      await startPreview();
+      framesRef.current = [];
+      recordingStartMsRef.current = performance.now();
+      isRecordingRef.current = true;
+    }, [startPreview]);
+
+    const stopRecording = useCallback((): void => {
+      isRecordingRef.current = false;
+      recordingStartMsRef.current = null;
+    }, []);
+
     useImperativeHandle(
       ref,
       () => ({
         getFrames: () => [...framesRef.current],
-        start,
+        start: startRecording,
+        startPreview,
+        startRecording,
+        stopRecording,
         stop,
       }),
-      [start, stop],
+      [startPreview, startRecording, stop, stopRecording],
     );
 
     useEffect(() => {
@@ -194,7 +233,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(
           />
         </div>
         <p className="sr-only" role="status">
-          {isRunning ? 'Camera running' : 'Camera stopped'}
+          {isRunning ? 'Camera preview running' : 'Camera stopped'}
         </p>
       </div>
     );
