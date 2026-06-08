@@ -37,6 +37,20 @@ export const appRoutes: RouteObject[] = [
         },
       },
       {
+        path: 'imu/record',
+        lazy: async () => {
+          const { ImuRecorderPage } = await import('./pages/ImuRecorderPage');
+          return { Component: ImuRecorderPage };
+        },
+      },
+      {
+        path: 'patient/:patientId/imu',
+        lazy: async () => {
+          const { ImuRecorderPage } = await import('./pages/ImuRecorderPage');
+          return { Component: ImuRecorderPage };
+        },
+      },
+      {
         path: 'patient/:patientId/analyzing',
         lazy: async () => {
           const { AnalyzingPage } = await import('./pages/AnalyzingPage');

@@ -18,6 +18,7 @@ import type {
 } from '../../src/components/CameraView';
 import { CapturePage } from '../../src/pages/CapturePage';
 import { useAssessmentStore } from '../../src/stores/assessmentStore';
+import { useNavigationGuardStore } from '../../src/stores/navigationGuardStore';
 import type { PoseFrame, PoseSequence } from '../../src/types/pose';
 
 const poseFrame: PoseFrame = {
@@ -87,6 +88,7 @@ describe('CapturePage', () => {
     fakeStopRecording.mockReset();
     fakePersistPoseSequence.mockReset();
     useAssessmentStore.getState().clearCapturedSequence();
+    useNavigationGuardStore.getState().unblockNavigation();
   });
 
   it('starts capture and updates recording summary', async () => {
@@ -140,10 +142,10 @@ describe('CapturePage', () => {
       expect(screen.getByText('Analyzing route')).toBeDefined();
     });
     expect(fakePersistPoseSequence).toHaveBeenCalledWith(
-      expect.objectContaining({
-        assessmentId: 'patient-1',
-        id: 'draft:patient-1',
-      }),
+        expect.objectContaining({
+          assessmentId: 'patient-1',
+          id: 'draft:patient-1:patient-1',
+        }),
     );
     expect(fakePersistPoseSequence.mock.calls[0]?.[0].data.frames).toEqual([
       poseFrame,
@@ -152,6 +154,30 @@ describe('CapturePage', () => {
     expect(useAssessmentStore.getState().capturedSequence?.frames).toEqual([
       poseFrame,
     ]);
+  });
+
+  it('stores capture drafts with the shared session id when provided', async () => {
+    renderCapturePage('/patient/patient-1/capture?sessionId=session-1');
+
+    await screen.findByText(
+      'Camera preview is active. Align the subject, then start recording.',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Start recording' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Stop recording' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Analyzing route')).toBeDefined();
+    });
+    expect(fakePersistPoseSequence).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assessmentId: 'session-1',
+          id: 'draft:patient-1:session-1',
+        }),
+    );
   });
 
   it('ignores a second start click while startup is in flight', async () => {
@@ -192,9 +218,9 @@ function createDeferred<T>(): {
 }
 
 /** Render CapturePage with route params and fake analyzing route. */
-function renderCapturePage(): void {
+function renderCapturePage(path = '/patient/patient-1/capture'): void {
   render(
-    <MemoryRouter initialEntries={['/patient/patient-1/capture']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route
           path="/patient/:patientId/capture"

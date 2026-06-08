@@ -7,7 +7,7 @@ import {
   Ruler,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   CameraView,
   type CameraViewHandle,
@@ -18,6 +18,7 @@ import { createDraftPoseSequenceId } from '@/lib/db/draftPoseSequence';
 import { savePoseSequence } from '@/lib/db/repositories';
 import { computeQualityScore } from '@/lib/pose/qc';
 import { useAssessmentStore } from '@/stores/assessmentStore';
+import { useNavigationGuardStore } from '@/stores/navigationGuardStore';
 import type { QualityScore } from '@/types/gait';
 import type { PoseFrame, PoseSequence } from '@/types/pose';
 
@@ -39,9 +40,14 @@ export function CapturePage({
   persistPoseSequence = savePoseSequence,
 }: CapturePageProps): React.JSX.Element {
   const { patientId: patientIdParam } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const setCapturedSequence = useAssessmentStore(
     (state) => state.setCapturedSequence,
+  );
+  const blockNavigation = useNavigationGuardStore((state) => state.blockNavigation);
+  const unblockNavigation = useNavigationGuardStore(
+    (state) => state.unblockNavigation,
   );
   const cameraRef = useRef<CameraViewHandle | null>(null);
   const isStartingRef = useRef(false);
@@ -53,9 +59,38 @@ export function CapturePage({
   const [isRecording, setIsRecording] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedCapture, setHasUnsavedCapture] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const patientId = patientIdParam ?? 'demo';
+  const sessionId = searchParams.get('sessionId') ?? patientId;
   const sequencePreview = useMemo(() => buildPoseSequence(frames), [frames]);
+
+  useEffect(() => {
+    const warning =
+      'A camera recording is still in progress. Stop recording before leaving this page.';
+
+    function handleBeforeUnload(event: BeforeUnloadEvent): void {
+      if (!isRecording && !hasUnsavedCapture && !isSaving) {
+        return;
+      }
+
+      event.preventDefault();
+      requireBeforeUnloadPrompt(event);
+    }
+
+    if (isRecording || hasUnsavedCapture || isSaving) {
+      blockNavigation(warning);
+    } else {
+      unblockNavigation();
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      unblockNavigation();
+    };
+  }, [blockNavigation, hasUnsavedCapture, isRecording, isSaving, unblockNavigation]);
 
   /** Start camera preview without adding frames to the current recording. */
   async function handleStartPreview(): Promise<void> {
@@ -101,9 +136,17 @@ export function CapturePage({
       return;
     }
 
+    if (
+      hasUnsavedCapture &&
+      !window.confirm('Starting a new recording will discard unsaved frames. Continue?')
+    ) {
+      return;
+    }
+
     isStartingRef.current = true;
     setErrorMessage(null);
     setFrames([]);
+    setHasUnsavedCapture(false);
     setQuality(null);
     setIsStarting(true);
 
@@ -142,12 +185,16 @@ export function CapturePage({
     try {
       setIsSaving(true);
       await persistPoseSequence({
-        assessmentId: patientId,
+        assessmentId: sessionId,
         data: sequence,
-        id: createDraftPoseSequenceId(patientId),
+        id: createDraftPoseSequenceId(sessionId, patientId),
       });
       setCapturedSequence(sequence);
-      navigate(`/patient/${patientId}/analyzing`);
+      setHasUnsavedCapture(false);
+      unblockNavigation();
+      navigate(
+        `/patient/${patientId}/analyzing?sessionId=${encodeURIComponent(sessionId)}`,
+      );
     } catch (error) {
       setErrorMessage(createPosePersistenceErrorMessage(error));
     } finally {
@@ -157,6 +204,7 @@ export function CapturePage({
 
   /** Update local recording state whenever a pose frame arrives. */
   function handlePoseFrame(frame: PoseFrame): void {
+    setHasUnsavedCapture(true);
     setFrames((currentFrames) => {
       const nextFrames = [...currentFrames, frame];
       const sequence = buildPoseSequence(nextFrames);
@@ -285,16 +333,31 @@ export function CapturePage({
               </div>
             </dl>
           </div>
-          <Link
-            className="text-sm font-medium text-teal-700 hover:text-teal-800"
-            to="/"
-          >
-            Back to patients
-          </Link>
+          {isRecording || hasUnsavedCapture || isSaving ? (
+            <p className="text-sm font-medium text-amber-700">
+              Stop camera recording and save before leaving this page.
+            </p>
+          ) : (
+            <Link
+              className="text-sm font-medium text-teal-700 hover:text-teal-800"
+              to="/"
+            >
+              Back to patients
+            </Link>
+          )}
         </div>
       </div>
     </section>
   );
+}
+
+/** Request legacy beforeunload prompting without reading deprecated properties. */
+function requireBeforeUnloadPrompt(event: BeforeUnloadEvent): void {
+  Object.defineProperty(event, 'returnValue', {
+    configurable: true,
+    value: '',
+    writable: true,
+  });
 }
 
 /** Convert camera and pose startup failures into actionable user messages. */

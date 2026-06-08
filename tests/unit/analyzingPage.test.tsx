@@ -60,6 +60,9 @@ describe('AnalyzingPage', () => {
       }),
     );
     expect(repository.saveResult).toHaveBeenCalledWith(result);
+    expect(repository.deletePoseSequence).toHaveBeenCalledWith(
+      'draft:patient-1:patient-1',
+    );
     expect(repository.deletePoseSequence).toHaveBeenCalledWith('draft:patient-1');
     expect(useAssessmentStore.getState().capturedSequence).toBeNull();
   });
@@ -81,8 +84,38 @@ describe('AnalyzingPage', () => {
     });
     expect(repository.getPoseSequenceByAssessment).toHaveBeenCalledWith(patient.id);
     expect(analyze).toHaveBeenCalledWith(sequence, patient);
+    expect(repository.deletePoseSequence).toHaveBeenCalledWith(
+      'draft:patient-1:patient-1',
+    );
     expect(repository.deletePoseSequence).toHaveBeenCalledWith('draft:patient-1');
   });
+
+  it('recovers and deletes draft capture by shared session id when provided', async () => {
+    const result = createResultFixture();
+    const analyze = vi.fn(() => Promise.resolve(result));
+    const repository = createRepository();
+
+    repository.getPoseSequenceByAssessment.mockResolvedValueOnce({
+      assessmentId: 'session-1',
+      data: sequence,
+      id: 'draft:session-1',
+    });
+    renderAnalyzingPage({
+      analyze,
+      path: '/patient/patient-1/analyzing?sessionId=session-1',
+      repository,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Result route')).toBeDefined();
+    });
+    expect(repository.getPoseSequenceByAssessment).toHaveBeenCalledWith('session-1');
+    expect(repository.deletePoseSequence).toHaveBeenCalledWith(
+      'draft:patient-1:session-1',
+    );
+    expect(repository.deletePoseSequence).toHaveBeenCalledWith('draft:patient-1');
+  });
+
 
   it('shows an error when no captured sequence is available', async () => {
     renderAnalyzingPage({
@@ -119,13 +152,15 @@ describe('AnalyzingPage', () => {
 /** Render AnalyzingPage with route context and dependency injection. */
 function renderAnalyzingPage({
   analyze,
+  path = '/patient/patient-1/analyzing',
   repository,
 }: {
   analyze: (sequence: PoseSequence, patient: Patient) => Promise<GaitAnalysisResult>;
+  path?: string;
   repository: AnalyzingPageRepository;
 }): void {
   render(
-    <MemoryRouter initialEntries={['/patient/patient-1/analyzing']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route
           path="/patient/:patientId/analyzing"

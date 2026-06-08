@@ -1,8 +1,15 @@
 import type { Assessment } from '@/types/assessment';
 import type { GaitAnalysisResult } from '@/types/gait';
+import type { ImuSequence } from '@/types/imu';
 import type { Patient } from '@/types/patient';
 import type { PoseSequence } from '@/types/pose';
-import { db, type GaitDB, type PoseSequenceRecord } from '@/lib/db/schema';
+import {
+  db,
+  type GaitDB,
+  type ImuSequenceRecord,
+  type PoseSequenceRecord,
+} from '@/lib/db/schema';
+import { createDraftPoseSequenceId } from '@/lib/db/draftPoseSequence';
 
 /** Create or replace a patient record. */
 export async function createPatient(
@@ -33,21 +40,33 @@ export async function deletePatient(
 ): Promise<void> {
   await database.transaction(
     'rw',
-    database.patients,
-    database.assessments,
-    database.poseSequences,
-    database.results,
+    [
+      database.patients,
+      database.assessments,
+      database.imuSequences,
+      database.poseSequences,
+      database.results,
+    ],
     async () => {
       const assessments = await database.assessments.where({ patientId }).toArray();
       const assessmentIds = assessments.map((assessment) => assessment.id);
       // Draft captures are indexed by patientId until analysis creates a final assessment.
       const poseAssessmentIds = [...assessmentIds, patientId];
+      const patientDraftPrefix = `draft:${patientId}:`;
 
       await Promise.all([
         database.patients.delete(patientId),
         database.assessments.where({ patientId }).delete(),
         database.results.where({ patientId }).delete(),
+        database.imuSequences.where({ patientId }).delete(),
         database.poseSequences.where('assessmentId').anyOf(poseAssessmentIds).delete(),
+        database.poseSequences
+          .filter(
+            (record) =>
+              record.id === createDraftPoseSequenceId(patientId) ||
+              record.id.startsWith(patientDraftPrefix),
+          )
+          .delete(),
       ]);
     },
   );
@@ -103,6 +122,39 @@ export async function deletePoseSequence(
   await database.poseSequences.delete(recordId);
 }
 
+/** Save or replace one captured IMU sequence. */
+export async function saveImuSequence(
+  record: ImuSequenceRecord,
+  database: GaitDB = db,
+): Promise<string> {
+  await database.imuSequences.put(record);
+  return record.id;
+}
+
+/** Fetch an IMU sequence record by assessment or draft identifier. */
+export async function getImuSequenceByAssessment(
+  assessmentId: string,
+  database: GaitDB = db,
+): Promise<ImuSequenceRecord | undefined> {
+  return database.imuSequences.where({ assessmentId }).first();
+}
+
+/** List all IMU sequence records for one patient. */
+export async function listImuSequencesByPatient(
+  patientId: string,
+  database: GaitDB = db,
+): Promise<ImuSequenceRecord[]> {
+  return database.imuSequences.where({ patientId }).toArray();
+}
+
+/** Delete an IMU sequence record by internal identifier. */
+export async function deleteImuSequence(
+  recordId: string,
+  database: GaitDB = db,
+): Promise<void> {
+  await database.imuSequences.delete(recordId);
+}
+
 /** Save or replace an analysis result. */
 export async function saveResult(
   result: GaitAnalysisResult,
@@ -134,6 +186,19 @@ export async function deleteResult(
   database: GaitDB = db,
 ): Promise<void> {
   await database.results.delete(assessmentId);
+}
+
+/** Create a minimal empty IMU sequence for tests and recovery flows. */
+export function createEmptyImuSequence(capturedAt: string): ImuSequence {
+  return {
+    capturedAt,
+    deviceType: 'phone',
+    durationMs: 0,
+    placement: 'unknown',
+    sampleRateHz: 0,
+    samples: [],
+    syncMode: 'manual',
+  };
 }
 
 /** Create a minimal empty pose sequence for tests and recovery flows. */

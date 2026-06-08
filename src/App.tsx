@@ -1,18 +1,44 @@
-import { Activity, FilePlus2, Home, Settings } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Activity, FilePlus2, Home, Settings, Smartphone } from 'lucide-react';
+import { useCallback, useEffect } from 'react';
+import { NavLink, Outlet, useBlocker } from 'react-router-dom';
+import { useNavigationGuardStore } from '@/stores/navigationGuardStore';
 
 const navItems = [
   { label: 'Patients', to: '/', icon: Home },
   { label: 'New Patient', to: '/patient/new', icon: FilePlus2 },
+  { label: 'IMU Recorder', to: '/imu/record', icon: Smartphone },
 ] as const;
 
 /** Render the application shell and nested route outlet. */
 function App(): React.JSX.Element {
+  const navigationGuardMessage = useNavigationGuardStore((state) => state.message);
+  const shouldBlockNavigation = useCallback(
+    () => useNavigationGuardStore.getState().isBlocked,
+    [],
+  );
+  const navigationBlocker = useBlocker(shouldBlockNavigation);
+
+  useEffect(() => {
+    if (navigationBlocker.state !== 'blocked') {
+      return;
+    }
+
+    if (window.confirm(navigationGuardMessage)) {
+      navigationBlocker.proceed();
+    } else {
+      navigationBlocker.reset();
+    }
+  }, [navigationBlocker, navigationGuardMessage]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-5 py-4 sm:px-8 md:flex-row md:items-center md:justify-between">
-          <NavLink aria-label="Gait Analysis home" className="flex items-center gap-3" to="/">
+          <NavLink
+            aria-label="Gait Analysis home"
+            className="flex items-center gap-3"
+            to="/"
+          >
             <span className="flex h-10 w-10 items-center justify-center rounded-md bg-teal-700 text-white">
               <Activity aria-hidden="true" className="h-5 w-5" />
             </span>

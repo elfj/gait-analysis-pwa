@@ -1,6 +1,6 @@
 import { CheckCircle2, Loader2, RotateCcw, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   createAssessment,
   deletePoseSequence,
@@ -77,6 +77,7 @@ export function AnalyzingPage({
   repository = defaultRepository,
 }: AnalyzingPageProps): React.JSX.Element {
   const { patientId: patientIdParam } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const capturedSequence = useAssessmentStore((state) => state.capturedSequence);
   const clearCapturedSequence = useAssessmentStore((state) => state.clearCapturedSequence);
@@ -86,6 +87,7 @@ export function AnalyzingPage({
   const [failureQuality, setFailureQuality] = useState<QualityScore | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const patientId = patientIdParam ?? '';
+  const sessionId = searchParams.get('sessionId') ?? patientId;
 
   useEffect(() => {
     let isMounted = true;
@@ -100,7 +102,7 @@ export function AnalyzingPage({
       try {
         const storedPoseSequence = capturedSequence
           ? undefined
-          : await repository.getPoseSequenceByAssessment(patientId);
+          : await repository.getPoseSequenceByAssessment(sessionId);
         sequenceForAnalysis = capturedSequence ?? storedPoseSequence?.data ?? null;
 
         if (!sequenceForAnalysis) {
@@ -139,7 +141,10 @@ export function AnalyzingPage({
           id: crypto.randomUUID(),
         });
         await repository.saveResult(result);
-        await repository.deletePoseSequence(createDraftPoseSequenceId(patientId));
+        await Promise.all([
+          repository.deletePoseSequence(createDraftPoseSequenceId(sessionId, patientId)),
+          repository.deletePoseSequence(createDraftPoseSequenceId(patientId)),
+        ]);
 
         if (!isMounted) {
           return;
@@ -165,7 +170,16 @@ export function AnalyzingPage({
     return () => {
       isMounted = false;
     };
-  }, [analyze, capturedSequence, clearCapturedSequence, navigate, patientId, repository, retryCount]);
+  }, [
+    analyze,
+    capturedSequence,
+    clearCapturedSequence,
+    navigate,
+    patientId,
+    repository,
+    retryCount,
+    sessionId,
+  ]);
 
   return (
     <section className="max-w-3xl space-y-6">
@@ -216,7 +230,7 @@ export function AnalyzingPage({
           ) : null}
           <Link
             className="ml-3 inline-flex rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
-            to={`/patient/${patientId}/capture`}
+            to={`/patient/${patientId}/capture?sessionId=${encodeURIComponent(sessionId)}`}
           >
             Retake capture
           </Link>

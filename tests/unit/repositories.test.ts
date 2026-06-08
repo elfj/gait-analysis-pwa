@@ -2,17 +2,22 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createAssessment,
+  createEmptyImuSequence,
   createEmptyPoseSequence,
   createPatient,
   deleteAssessment,
+  deleteImuSequence,
   deletePatient,
   deletePoseSequence,
   deleteResult,
   getAssessment,
+  getImuSequenceByAssessment,
   getPatient,
   getPoseSequenceByAssessment,
   getResult,
+  listImuSequencesByPatient,
   listPatients,
+  saveImuSequence,
   listResultsByPatient,
   savePoseSequence,
   saveResult,
@@ -146,12 +151,32 @@ describe('IndexedDB repositories', () => {
       data: createEmptyPoseSequence(now),
       id: `draft:${patient.id}`,
     };
+    const sessionDraftPoseRecord = {
+      assessmentId: 'session-1',
+      data: createEmptyPoseSequence(now),
+      id: `draft:${patient.id}:session-1`,
+    };
+    const imuRecord = {
+      assessmentId: patient.id,
+      data: createEmptyImuSequence(now),
+      id: `imu:draft:${patient.id}:1234`,
+      patientId: patient.id,
+    };
+    const finalImuRecord = {
+      assessmentId: assessment.id,
+      data: createEmptyImuSequence(now),
+      id: 'imu-sequence-final',
+      patientId: patient.id,
+    };
 
     await createPatient(patient, database);
     await createAssessment(assessment, database);
     await saveResult(result, database);
     await savePoseSequence(finalPoseRecord, database);
     await savePoseSequence(draftPoseRecord, database);
+    await savePoseSequence(sessionDraftPoseRecord, database);
+    await saveImuSequence(imuRecord, database);
+    await saveImuSequence(finalImuRecord, database);
 
     await deletePatient(patient.id, database);
 
@@ -164,6 +189,15 @@ describe('IndexedDB repositories', () => {
     await expect(
       getPoseSequenceByAssessment(patient.id, database),
     ).resolves.toBeUndefined();
+    await expect(
+      getPoseSequenceByAssessment(sessionDraftPoseRecord.assessmentId, database),
+    ).resolves.toBeUndefined();
+    await expect(
+      getImuSequenceByAssessment(patient.id, database),
+    ).resolves.toBeUndefined();
+    await expect(
+      listImuSequencesByPatient(patient.id, database),
+    ).resolves.toEqual([]);
   });
 
   it('writes, reads, and deletes assessments', async () => {
@@ -203,6 +237,31 @@ describe('IndexedDB repositories', () => {
 
     await expect(
       getPoseSequenceByAssessment(record.assessmentId, database),
+    ).resolves.toBeUndefined();
+  });
+
+  it('writes, reads, lists, and deletes IMU sequences', async () => {
+    database = createTestDatabase();
+    const record = {
+      assessmentId: 'assessment-1',
+      data: createEmptyImuSequence(now),
+      id: 'imu-sequence-1',
+      patientId: 'patient-1',
+    };
+
+    await expect(saveImuSequence(record, database)).resolves.toBe(record.id);
+
+    await expect(
+      getImuSequenceByAssessment(record.assessmentId, database),
+    ).resolves.toEqual(record);
+    await expect(
+      listImuSequencesByPatient(record.patientId, database),
+    ).resolves.toEqual([record]);
+
+    await deleteImuSequence(record.id, database);
+
+    await expect(
+      getImuSequenceByAssessment(record.assessmentId, database),
     ).resolves.toBeUndefined();
   });
 
