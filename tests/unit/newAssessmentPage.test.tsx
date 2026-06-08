@@ -1,11 +1,29 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NewAssessmentPage } from '@/pages/NewAssessmentPage';
 
 describe('NewAssessmentPage', () => {
+  let writeTextMock: ReturnType<typeof vi.fn<(text: string) => Promise<void>>>;
+
+  beforeEach(() => {
+    writeTextMock = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: writeTextMock,
+      },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
   it('links to camera capture and patient IMU recording when patient id is present', () => {
     renderNewAssessment('/assessment/new/patient-1');
 
@@ -21,6 +39,25 @@ describe('NewAssessmentPage', () => {
     expect(captureUrl.searchParams.get('sessionId')).toBeTruthy();
     expect(imuUrl.searchParams.get('sessionId')).toBe(
       captureUrl.searchParams.get('sessionId'),
+    );
+    expect(
+      screen.getByRole('img', { name: 'QR code for paired IMU recorder' }),
+    ).toBeDefined();
+    expect(screen.getByText(/sessionId=/u).textContent).toContain(
+      captureUrl.searchParams.get('sessionId'),
+    );
+  });
+
+  it('copies the paired IMU recording link', async () => {
+    renderNewAssessment('/assessment/new/patient-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy IMU link' }));
+
+    expect(writeTextMock).toHaveBeenCalledWith(
+      expect.stringContaining('/patient/patient-1/imu?sessionId='),
+    );
+    expect((await screen.findByRole('status')).textContent).toContain(
+      'IMU link copied.',
     );
   });
 
